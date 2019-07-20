@@ -5,29 +5,30 @@
 # This is the first step in the pipeline.
 # Seurat v3.0.2 is used
 #
-# 1. Import data, identify batch effects
-# 2. Expression of M/F cells - remove putative doublets - give each cell a label based on this
-# 3. Cluster
-# 4. Cluster using diff method and compare
-# 5. Analyze chosen cluster labels, characterize cell types captured
-# 6. Recluster based on subtypes
-# A. Look at overall expression of
-# B. Differential expression between groups
+# 1. InitializeVars - Import data from 10X, Make combined object
+# 2. Cluster - Scale, run PCA, run UMAP, Find Neighbors, Find Clusters, Visualize Batch Effects, Identify Cell Type Markers
+# 3. ComparePopCounts - compare population sizes between factors of interest
+# 4. CompareDE - compare differential expression between factors of interest
 #
+# S. Script to demultiplex on the basis of sex, and identify putative doublets using co-expression of Xist and Ymarker genes
+# C. Script for comparing cluster stability when clusters made using different methods?
 #
 # Explains the basic QC steps: https://satijalab.org/seurat/v3.0/pbmc3k_tutorial.html
 #
 # Following tutorial here: https://satijalab.org/seurat/v3.0/immune_alignment.html
 # 
+# Integration explained: https://satijalab.org/seurat/v3.0/integration.html
+#
 # # # # # # # # # # # # # # # # # #
 
 # Load needed library
-# Load older version of Seurat which has the functions I need
 library('Seurat') 
 library('cowplot')
+library('ggplot2')
 
 packageVersion('Seurat')
 packageVersion('cowplot')
+packageVersion('ggplot2')
 
 
 # import from command line
@@ -131,6 +132,9 @@ myCondSeurat <- function(filenames, mtxPath, condName, files, minCells, nFeature
     # filter out cells if desired for this round
     data_tmp <- subset(data_tmp, subset = nFeature_RNA > 1000 & nFeature_RNA < 7500) # numbers need to be typed in
     
+    # LIST OF CELLS TO REMOVE GOES HERE
+    # subset(data_tmp, cell_id %in% (putative doublets))
+    
     # normalize data and find variable featuers
     print('Normalize the data...')
     data_tmp <- NormalizeData(data_tmp, verbose = FALSE)
@@ -177,6 +181,7 @@ wt.sal <- myCondSeurat(filenames = list.filenames.wt.sal,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
+wt.sal <- FindVariableFeatures(wt.sal, selection.method = "vst", nfeatures = 2000)
 
 wt.lps <- myCondSeurat(filenames = list.filenames.wt.lps, 
                        mtxPath = mtxPath, 
@@ -185,6 +190,8 @@ wt.lps <- myCondSeurat(filenames = list.filenames.wt.lps,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
+wt.lps <- FindVariableFeatures(wt.lps, selection.method = "vst", nfeatures = nFeatures_chosen)
+
 
 het.sal <- myCondSeurat(filenames = list.filenames.het.sal, 
                        mtxPath = mtxPath, 
@@ -193,6 +200,8 @@ het.sal <- myCondSeurat(filenames = list.filenames.het.sal,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
+het.sal <- FindVariableFeatures(het.sal, selection.method = "vst", nfeatures = nFeatures_chosen)
+
 
 het.lps <- myCondSeurat(filenames = list.filenames.het.lps, 
                        mtxPath = mtxPath, 
@@ -201,28 +210,10 @@ het.lps <- myCondSeurat(filenames = list.filenames.het.lps,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
-
-# Justification for threshold choices
-## Run these after running myCondSeurat without visualizeFeatures(wt.sal)
-## Visualize QC metrics as a violin plot to check what nFeature_RNA should be
-## based on this, choose thresholding of 1000 (lower bound) and 7500 (upper bound)
-
-visualizeFeatures <- function(myObject){
-  v <- VlnPlot(myObject, features = c("nFeature_RNA", "nCount_RNA"))
-  f <- FeatureScatter(myObject, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-  
-  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot.pdf'), plot = v, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
-  ggsave(filename = paste0(deparse(substitute(myObject)), '_featureScatter.pdf'), plot = f, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
-  
-}
-
-visualizeFeatures(wt.sal)
-visualizeFeatures(wt.lps)
-visualizeFeatures(het.sal)
-visualizeFeatures(het.lps)
-
+het.lps <- FindVariableFeatures(het.lps, selection.method = "vst", nfeatures = nFeatures_chosen)
 
 # Print what is in each one
+print('Samples included in each variable:')
 table(wt.sal@meta.data$orig.ident)
 table(wt.lps@meta.data$orig.ident)
 table(het.sal@meta.data$orig.ident)
@@ -230,16 +221,75 @@ table(het.lps@meta.data$orig.ident)
 
 
 # Perform integration
-
 print('Performing integration...')
 print('Finding integration anchors...')
-data.anchors <- FindIntegrationAnchors(object.list = list(wt.sal, wt.lps, het.sal, het.lps), dims = 1:40)
-data.combined <- IntegrateData(anchorset = immune.anchors, dims = 1:40)
+data.anchors <- FindIntegrationAnchors(object.list = list(wt.sal, wt.lps, het.sal, het.lps), dims = 1:49)
+data.combined <- IntegrateData(anchorset = data.anchors, dims = 1:49)
+
+# Visualize Features for QC Purposes
+## Run these after running myCondSeurat without visualizeFeatures(wt.sal)
+## Visualize QC metrics as a violin plot to check what nFeature_RNA should be
+## based on this, choose thresholding of 1000 (lower bound) and 7500 (upper bound)
+
+## create subdirectory to store output
+subDir_visFeatures <- 'visualizeFeatures'
+setwd(file.path(outputDir, subDir))
+if (file.exists(subDir_visFeatures)){
+  setwd(file.path(outputDir, subDir,subDir_visFeatures))
+} else {
+  dir.create(file.path(outputDir, subDir, subDir_visFeatures))
+  setwd(file.path(outputDir, subDir, subDir_visFeatures))
+}
+
+## generate feature vis graphs
+visualizeFeatures <- function(myObject){
+  v <- VlnPlot(myObject, features = c("nFeature_RNA", "nCount_RNA"))
+  v1 <- VlnPlot(data.combined, features = c("nFeature_RNA", "nCount_RNA"), group.by='orig.ident')
+  v2 <- VlnPlot(data.combined, features = c("nFeature_RNA", "nCount_RNA"), group.by='cond')
+  f <- FeatureScatter(myObject, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot.pdf'), plot = v, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot_byOrigIdent.pdf'), plot = v1, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot_byCond.pdf'), plot = v2, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_featureScatter.pdf'), plot = f, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
+  
+}
+
+visualizeFeatures(wt.sal)
+visualizeFeatures(wt.lps)
+visualizeFeatures(het.sal)
+visualizeFeatures(het.lps)
+visualizeFeatures(data.combined)
+
+
+# Use Jackstraw plots to determine the dimensionality of data and back-justify better dimensions for data anchors
+## justification: estimated number using https://github.com/satijalab/seurat/issues/1248
+
+## create subdirectory to store output
+subDir_jackstraw <- 'jackstraw'
+setwd(file.path(outputDir, subDir))
+if (file.exists(subDir_jackstraw)){
+  setwd(file.path(outputDir, subDir,subDir_jackstraw))
+} else {
+  dir.create(file.path(outputDir, subDir, subDir_jackstraw))
+  setwd(file.path(outputDir, subDir, subDir_jackstraw))
+}
+
+## perform jackstraw for each individual object
+for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
+  ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
+  ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=80) #!! ERROR: max(nu, nv) must be positive
+  ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=80)
+  ds_explore <- ScoreJackStraw(ds_explore, dims = 30:70) #looking for where sharp dropoff
+  j <- JackStrawPlot(ds_explore, dims = 30:70)
+  ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir), width = 30, height=12, units ='cm')
+}
 
 
 # save variables
+print('saving variables...')
 setwd(file.path(outputDir, subDir))
-save.image(file = paste0("mostVars_beforeJackstraw.RData"))
+save.image(file = paste0("allVars.RData"))
 save(wt.sal, file = 'seuratObj_wt.sal.RData')
 save(wt.lps, file = 'seuratObj_wt.lps.RData')
 save(het.sal, file = 'seuratObj_het.sal.RData')
@@ -247,49 +297,13 @@ save(het.lps, file = 'seuratObj_het.lps.RData')
 save(data.combined, file = 'seuratObj_data.combined.RData')
 
 
-# visualize
-p_labels <- DimPlot(data.combined, reduction = "umap", label = TRUE)
-ggsave(filename = paste0('umap_all_labels.pdf'), plot = p_labels, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
-
-
-# add metadata
-myCells <- data.frame(cellNames = data.combined@cell.names)
-myCells$Identity <- data.combined@meta.data$origSample
-metadataCols <- c('SampleID','CellsPerSample','SurgeryDate','Condition', 'Genotype', 'Litter', 'Condition', 'OrderOfExtraction')
-myMetadata <- merge(myCells, metadata[,metadataCols], by.x='Identity', by.y='SampleID')
-rownames(myMetadata) <- myMetadata$cellNames
-
-## add metadata to Seurat object
-data.combined <- AddMetaData(data.combined, myMetadata[,-c(1:2)], col.name = metadataCols[-c(1:2)])
-
-
-
-# Use Jackstraw plots to determine dimensionality of data to better determine dimensions for data anchors
-library(ggplot2)
-
-for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
-  ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
-  ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=80)
-  ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=80)
-  ds_explore <- ScoreJackStraw(ds_explore, dims = 1:70) #looking for where sharp dropoff
-  j <- JackStrawPlot(ds_explore, dims = 1:70)
-  ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir), width = 30, height=12, units ='cm')
-}
-
-
-## visualize batch effects
-
-for (b in metadataCols){
-  p1 <- DimPlot(data.combined, reduction = "umap", group.by = b)
-  ggsave(filename = paste0('umap_batch', b,'.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
-}
-
-
-
-save.image(file = paste0("allVars_beforeJackstraw.RData"))
-
-
 print('~*~ All done! ~*~')
+
+
+
+
+
+
 
 # ## BONUS ## MAKING NEW CSV FOR POOLED RUNTHRU
 # 
