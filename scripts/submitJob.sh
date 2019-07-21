@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=124G
 #SBATCH --partition=interactive
-#SBATCH --job-name=subc_13_25
+#SBATCH --job-name=justOneSamp_H
 #SBATCH --time=6-00:00:00
 #SBATCH --mail-user=kmuench@stanford.edu
 #SBATCH --mail-type=ALL
@@ -21,6 +21,13 @@
 # Paper motivating Seurat3: https://www-cell-com.stanford.idm.oclc.org/cell/fulltext/S0092-8674(19)30559-8
 #
 # Who did extraction metadata: /labs/tpalmer/projects/cnv16p/data/scRNASeq/mouse/metadata/20190720_whoDidExtraction.csv
+#
+# Pipeline done according to how I think it should be done: $OUTPUT_16p/201907_cluster_seurat_10x_ms/20190720_s1s2_normalization_filter1000filter7500
+# Test pipeline: $OUTPUT_16p/201907_cluster_seurat_10x_ms/20190716_remakePipeline
+# No filtering of data: Test pipeline: $OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_normalization_noFilter
+# No normalizing of data: Test pipeline: $OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_noNormalizing_filter1000filter7500
+# just smple H: Test pipeline: $OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_H
+# jsut sample I: Test pipeline: $OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_I
 #
 # Example run:
 # qsub submitJob.sh
@@ -34,7 +41,7 @@ module load miniconda/3 # to get access to UMAP
 
 # load in paths
 #barcodeSampleLUT=/scratch/users/kmuench/output/cnv16p/201901_cluster_pooled_10x_ms/20190326_troubleshootRunthrough/determineCellSex/allNewID_cells.csv # could be demultiplexed IDs or not
-outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/20190720_s1s2_normalization_filter1000filter7500" # directory where output stored
+outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_H" # directory where output stored
 
 # declare for documentation purposes what these variables are
 echo 'Barcode Sample Lookup Table Location: ' $barcodeSampleLUT
@@ -43,7 +50,7 @@ echo 'Output Directory: ' $outputDir
 # Import data
 ## Order of variables: (1)output loc , (2) Metadata.csv , (3) Folder containin .mtx data from 10x  # (4) (if applicable) barcodeSampleLUT     e.g. $barcodeSampleLUT
 echo 'Making variables...'
-#Rscript 1_initializeVars.R $outputDir $METADAT_16p_SC_MS $MTX_16p_SC_MS  
+Rscript 1_initializeVars.R $outputDir $METADAT_16p_SC_MS $MTX_16p_SC_MS  
 
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined

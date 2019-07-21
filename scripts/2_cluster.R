@@ -37,13 +37,13 @@ metadataPath <- args[2]
 dataCombinedPath <- args[3]
 
 # Import data
-#dataCombinedPath <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/20190716_remakePipeline/initializeVars/seuratObj_data.combined.RData'
+#dataCombinedPath <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/s1s2_I/initializeVars/seuratObj_data.combined.RData'
 load(dataCombinedPath)
 
 #metadataPath <- '/labs/tpalmer/projects/cnv16p/data/scRNASeq/mouse/metadata/20190718_sampleTable.csv'
 metadata<-read.csv(metadataPath)
 
-#outputDir <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/20190716_remakePipeline/'
+#outputDir <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/s1s2_I/'
 
 
 # Create folder to store output
@@ -61,15 +61,15 @@ if (file.exists(subDir)){
 # add metadata to Seurat object
 myCells <- data.frame(cellNames = row.names(data.combined@meta.data), Identity = data.combined@meta.data$orig.ident)
 metadataCols <- c('SampleID','CellsPerSample','SurgeryDate','Condition', 'Genotype', 'Litter', 'OrderOfLitterExtraction')
-myMetadata <- merge(myCells, metadata[,metadataCols], by.x='Identity', by.y='SampleID')
+myMetadata <- merge(metadata[,metadataCols], myCells, by.x='SampleID', by.y='Identity')
 rownames(myMetadata) <- myMetadata$cellNames
-data.combined <- AddMetaData(data.combined, myMetadata[,-c(1:2)], col.name = metadataCols[-c(1:2)]) ## add metadata to Seurat object
+data.combined <- AddMetaData(data.combined, myMetadata, col.name = metadataCols) ## add metadata to Seurat object
 
 
 # Perform clustering
 
 ## Declare that this is integrated analysis
-DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
+#DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
 
 ## Run the standard workflow for visualization and clustering
 print('Scaling data, running PCA...')
@@ -78,8 +78,8 @@ data.combined <- RunPCA(data.combined, npcs = 70, verbose = FALSE)
 
 ## t-SNE and Clustering
 print('Running UMAP and finding neighbors...')
-data.combined <- RunUMAP(data.combined, reduction = "pca", dims = 1:40)
-data.combined <- FindNeighbors(data.combined, reduction = "pca", dims = 1:40)
+data.combined <- RunUMAP(data.combined, reduction = "pca", dims = 1:49)
+data.combined <- FindNeighbors(data.combined, reduction = "pca", dims = 1:49)
 
 save(data.combined, file = 'seuratObj_data.combined_beforeClustering.RData')
 
@@ -111,18 +111,20 @@ for (r in resToTry){
   
   # Identify cell type markers
   ## Generate lists and save
-  numClust <- max(as.numeric(data.combined@meta.data[,paste0('integrated_snn_res.',r)])) # !!!!! WHAT DO COLNAMES LOOK LIKE
+  #numClust <- max(as.numeric(data.combined@meta.data[,paste0('integrated_snn_res.',r)]))
+  numClust <- max(as.numeric(data.combined@meta.data[,paste0('RNA_snn_res.',r)])) # !!! REMOVE AFTER DOING SINGLES
   print(paste0('The numbers of clusters found is ', numClust))
-  for (c in c(1:numClust)){
+  for (c in c(0:(numClust-1))){
     print(paste0('Finding markers for cluster ', c, '...'))
     
     tmp_markers <- FindConservedMarkers(data.combined, ident.1 = as.numeric(c), grouping.var = "cond", verbose = FALSE)
-    
+
     write.csv(tmp_markers, file = paste0('clustMarker_',c, '.csv'))
     assign(paste0('clustMarker_', c) , tmp_markers)
   }
   
-  save(ls()[grep('clustMarker_',ls())], file = paste0('clusterMarkers_res', r,'.RData'))
+  #objectsToSave <- ls()[grep('clustMarker_',ls())]
+  #save( eval(parse(text=objectsToSave)) , file = paste0('clusterMarkers_res', r,'.RData'))
   
   # Visualize batch effects
   print(paste0('Visualizing batch effects for resolution ', r, '...'))
@@ -142,8 +144,8 @@ for (r in resToTry){
     p1 <- DimPlot(data.combined, reduction = "umap", group.by = b)
     p_split <- DimPlot(data.combined, reduction = "umap", split.by = b)
     
-    ggsave(filename = paste0('umap_batch_', b,'.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
-    ggsave(filename = paste0('umap_batch_splitby_', b,'.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
+    ggsave(filename = paste0('umap_batch_', b,'.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 20, height=20, units ='cm')
+    ggsave(filename = paste0('umap_batch_splitby_', b,'.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 20, height=20, units ='cm')
   }
   
 
@@ -158,4 +160,6 @@ print('Saving variables...')
 setwd(file.path(outputDir, subDir))
 save.image(file = paste0("allVars.RData"))
 save(data.combined, file = 'seuratObj_data.combined.RData')
+
+print('~*~ All done! ~*~')
 
