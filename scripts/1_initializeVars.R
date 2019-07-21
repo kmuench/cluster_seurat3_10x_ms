@@ -118,7 +118,7 @@ myCondSeurat <- function(filenames, mtxPath, condName, files, minCells, nFeature
   #allCellIDs <- c()
   
   # now merge with the others
-  for (i in c(1:1)){ # replaced length(filenames) with 1
+  for (i in c(1:length(filenames))){ 
     
     print(paste0('Making initial Seurat object with ', filenames[i], '...'))
     nameOfThisObject <- paste0('data_', filenames[i])
@@ -154,10 +154,8 @@ myCondSeurat <- function(filenames, mtxPath, condName, files, minCells, nFeature
   print(paste0('Merging Seurat data...'))
   
   
-  # data <- merge(eval(parse(text=listOfObjects[1])), c(eval(parse(text=listOfObjects[2])), eval(parse(text=listOfObjects[3])), eval(parse(text=listOfObjects[4])) ), project = condName, 
-  #                     add.cell.ids = files_relevant[,2], merge.data = TRUE )
-  
-  data <- eval(parse(text=listOfObjects[1])) #!!!!!! REMOVE AFTER FINISHED DOING SINGLE SAMPLE
+  data <- merge(eval(parse(text=listOfObjects[1])), c(eval(parse(text=listOfObjects[2])), eval(parse(text=listOfObjects[3])), eval(parse(text=listOfObjects[4])) ), project = condName, 
+                      add.cell.ids = files_relevant[,2], merge.data = TRUE )
   
   # give everything in this Seurat Object a condition name
   print('Giving everything in merged object a condition name...')
@@ -186,48 +184,48 @@ wt.sal <- myCondSeurat(filenames = list.filenames.wt.sal,
                        nFeature_RNA_thresh = TRUE)
 wt.sal <- FindVariableFeatures(wt.sal, selection.method = "vst", nfeatures = 2000)
 
-# wt.lps <- myCondSeurat(filenames = list.filenames.wt.lps, 
-#                        mtxPath = mtxPath, 
-#                        condName = 'WT.LPS', 
-#                        files = files, 
-#                        minCells = 3, 
-#                        nFeatures_chosen = 2000,
-#                        nFeature_RNA_thresh = TRUE)
-# wt.lps <- FindVariableFeatures(wt.lps, selection.method = "vst", nfeatures = 2000)
-# 
-# 
-# het.sal <- myCondSeurat(filenames = list.filenames.het.sal, 
-#                        mtxPath = mtxPath, 
-#                        condName = 'HET.SAL', 
-#                        files = files, 
-#                        minCells = 3, 
-#                        nFeatures_chosen = 2000,
-#                        nFeature_RNA_thresh = TRUE)
-# het.sal <- FindVariableFeatures(het.sal, selection.method = "vst", nfeatures = 2000)
-# 
-# 
-# het.lps <- myCondSeurat(filenames = list.filenames.het.lps, 
-#                        mtxPath = mtxPath, 
-#                        condName = 'HET.LPS', 
-#                        files = files, 
-#                        minCells = 3, 
-#                        nFeatures_chosen = 2000,
-#                        nFeature_RNA_thresh = TRUE)
-# het.lps <- FindVariableFeatures(het.lps, selection.method = "vst", nfeatures = 2000)
-# 
-# # Print what is in each one
-# print('Samples included in each variable:')
-# table(wt.sal@meta.data$orig.ident)
-# table(wt.lps@meta.data$orig.ident)
-# table(het.sal@meta.data$orig.ident)
-# table(het.lps@meta.data$orig.ident)
-# 
-# 
-# # Perform integration
-# print('Performing integration...')
-# print('Finding integration anchors...')
-# data.anchors <- FindIntegrationAnchors(object.list = list(wt.sal, wt.lps, het.sal, het.lps), dims = 1:49)
-# data.combined <- IntegrateData(anchorset = data.anchors, dims = 1:49)
+wt.lps <- myCondSeurat(filenames = list.filenames.wt.lps,
+                       mtxPath = mtxPath,
+                       condName = 'WT.LPS',
+                       files = files,
+                       minCells = 3,
+                       nFeatures_chosen = 2000,
+                       nFeature_RNA_thresh = TRUE)
+wt.lps <- FindVariableFeatures(wt.lps, selection.method = "vst", nfeatures = 2000)
+
+
+het.sal <- myCondSeurat(filenames = list.filenames.het.sal,
+                       mtxPath = mtxPath,
+                       condName = 'HET.SAL',
+                       files = files,
+                       minCells = 3,
+                       nFeatures_chosen = 2000,
+                       nFeature_RNA_thresh = TRUE)
+het.sal <- FindVariableFeatures(het.sal, selection.method = "vst", nfeatures = 2000)
+
+
+het.lps <- myCondSeurat(filenames = list.filenames.het.lps,
+                       mtxPath = mtxPath,
+                       condName = 'HET.LPS',
+                       files = files,
+                       minCells = 3,
+                       nFeatures_chosen = 2000,
+                       nFeature_RNA_thresh = TRUE)
+het.lps <- FindVariableFeatures(het.lps, selection.method = "vst", nfeatures = 2000)
+
+# Print what is in each one
+print('Samples included in each variable:')
+table(wt.sal@meta.data$orig.ident)
+table(wt.lps@meta.data$orig.ident)
+table(het.sal@meta.data$orig.ident)
+table(het.lps@meta.data$orig.ident)
+
+
+# Perform integration
+print('Performing integration...')
+print('Finding integration anchors...')
+data.anchors <- FindIntegrationAnchors(object.list = list(wt.sal, wt.lps, het.sal, het.lps), dims = 1:49)
+data.combined <- IntegrateData(anchorset = data.anchors, dims = 1:49)
 
 # Visualize Features for QC Purposes
 ## Run these after running myCondSeurat without visualizeFeatures(wt.sal)
@@ -261,34 +259,34 @@ visualizeFeatures <- function(myObject){
 }
 
 visualizeFeatures(wt.sal)
-# visualizeFeatures(wt.lps)
-# visualizeFeatures(het.sal)
-# visualizeFeatures(het.lps)
-# visualizeFeatures(data.combined)
+visualizeFeatures(wt.lps)
+visualizeFeatures(het.sal)
+visualizeFeatures(het.lps)
+visualizeFeatures(data.combined)
 
 
-# # Use Jackstraw plots to determine the dimensionality of data and back-justify better dimensions for data anchors
-# ## justification: estimated number using https://github.com/satijalab/seurat/issues/1248
-# 
-# ## create subdirectory to store output
-# subDir_jackstraw <- 'jackstraw'
-# setwd(file.path(outputDir, subDir))
-# if (file.exists(subDir_jackstraw)){
-#   setwd(file.path(outputDir, subDir,subDir_jackstraw))
-# } else {
-#   dir.create(file.path(outputDir, subDir, subDir_jackstraw))
-#   setwd(file.path(outputDir, subDir, subDir_jackstraw))
-# }
-# 
-# ## perform jackstraw for each individual object
-# for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
-#   ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
-#   ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=80) #!! ERROR: max(nu, nv) must be positive
-#   ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=80)
-#   ds_explore <- ScoreJackStraw(ds_explore, dims = 30:70) #looking for where sharp dropoff
-#   j <- JackStrawPlot(ds_explore, dims = 30:70)
-#   ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir), width = 30, height=12, units ='cm')
-# }
+# Use Jackstraw plots to determine the dimensionality of data and back-justify better dimensions for data anchors
+## justification: estimated number using https://github.com/satijalab/seurat/issues/1248
+
+## create subdirectory to store output
+subDir_jackstraw <- 'jackstraw'
+setwd(file.path(outputDir, subDir))
+if (file.exists(subDir_jackstraw)){
+  setwd(file.path(outputDir, subDir,subDir_jackstraw))
+} else {
+  dir.create(file.path(outputDir, subDir, subDir_jackstraw))
+  setwd(file.path(outputDir, subDir, subDir_jackstraw))
+}
+
+## perform jackstraw for each individual object
+for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
+  ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
+  ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=80) #!! ERROR: max(nu, nv) must be positive
+  ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=80)
+  ds_explore <- ScoreJackStraw(ds_explore, dims = 30:70) #looking for where sharp dropoff
+  j <- JackStrawPlot(ds_explore, dims = 30:70)
+  ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir), width = 30, height=12, units ='cm')
+}
 
 
 # save variables
@@ -296,9 +294,9 @@ print('saving variables...')
 setwd(file.path(outputDir, subDir))
 save.image(file = paste0("allVars.RData"))
 save(wt.sal, file = 'seuratObj_wt.sal.RData')
-# save(wt.lps, file = 'seuratObj_wt.lps.RData')
-# save(het.sal, file = 'seuratObj_het.sal.RData')
-# save(het.lps, file = 'seuratObj_het.lps.RData')
+save(wt.lps, file = 'seuratObj_wt.lps.RData')
+save(het.sal, file = 'seuratObj_het.sal.RData')
+save(het.lps, file = 'seuratObj_het.lps.RData')
 save(data.combined, file = 'seuratObj_data.combined.RData')
 
 

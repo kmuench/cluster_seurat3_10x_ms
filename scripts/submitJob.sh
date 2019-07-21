@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=124G
 #SBATCH --partition=interactive
-#SBATCH --job-name=justOneSamp_H
+#SBATCH --job-name=idealPipelineAllRes
 #SBATCH --time=6-00:00:00
 #SBATCH --mail-user=kmuench@stanford.edu
 #SBATCH --mail-type=ALL
@@ -41,7 +41,7 @@ module load miniconda/3 # to get access to UMAP
 
 # load in paths
 #barcodeSampleLUT=/scratch/users/kmuench/output/cnv16p/201901_cluster_pooled_10x_ms/20190326_troubleshootRunthrough/determineCellSex/allNewID_cells.csv # could be demultiplexed IDs or not
-outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_H" # directory where output stored
+outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_noNormalizing_filter1000filter7500" # directory where output stored
 
 # declare for documentation purposes what these variables are
 echo 'Barcode Sample Lookup Table Location: ' $barcodeSampleLUT

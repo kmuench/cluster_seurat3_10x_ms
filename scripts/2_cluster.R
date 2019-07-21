@@ -69,7 +69,7 @@ data.combined <- AddMetaData(data.combined, myMetadata, col.name = metadataCols)
 # Perform clustering
 
 ## Declare that this is integrated analysis
-#DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
+DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
 
 ## Run the standard workflow for visualization and clustering
 print('Scaling data, running PCA...')
@@ -86,9 +86,9 @@ save(data.combined, file = 'seuratObj_data.combined_beforeClustering.RData')
 ## Find clusters for list of resolutions
 print('Finding clusters...')
 
-#resToTry <- c(0.8, 1.2, 2, 7, 10)
+resToTry <- c(0.8, 1.2, 2, 7, 10)
 
-resToTry <- c(1.2)
+#resToTry <- c(1.2)
 
 for (r in resToTry){
   print(paste0('Finding clusters for resolution = ', r))
@@ -111,8 +111,7 @@ for (r in resToTry){
   
   # Identify cell type markers
   ## Generate lists and save
-  #numClust <- max(as.numeric(data.combined@meta.data[,paste0('integrated_snn_res.',r)]))
-  numClust <- max(as.numeric(data.combined@meta.data[,paste0('RNA_snn_res.',r)])) # !!! REMOVE AFTER DOING SINGLES
+  numClust <- max(as.numeric(data.combined@meta.data[,paste0('integrated_snn_res.',r)]))
   print(paste0('The numbers of clusters found is ', numClust))
   for (c in c(0:(numClust-1))){
     print(paste0('Finding markers for cluster ', c, '...'))
