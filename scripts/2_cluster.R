@@ -35,6 +35,7 @@ args <- commandArgs(TRUE)
 outputDir <- args[1]
 metadataPath <- args[2]
 dataCombinedPath <- args[3]
+resToTry <- args[4]
 
 # Import data
 #dataCombinedPath <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/s1s2_I/initializeVars/seuratObj_data.combined.RData'
@@ -86,10 +87,6 @@ save(data.combined, file = 'seuratObj_data.combined_beforeClustering.RData')
 ## Find clusters for list of resolutions
 print('Finding clusters...')
 
-resToTry <- c(0.8, 1.2, 2, 7, 10)
-
-#resToTry <- c(1.2)
-
 for (r in resToTry){
   print(paste0('Finding clusters for resolution = ', r))
   data.combined <- FindClusters(data.combined, resolution = r)
@@ -117,9 +114,12 @@ for (r in resToTry){
     print(paste0('Finding markers for cluster ', c, '...'))
     
     tmp_markers <- FindConservedMarkers(data.combined, ident.1 = as.numeric(c), grouping.var = "cond", verbose = FALSE)
-
+    
     write.csv(tmp_markers, file = paste0('clustMarker_',c, '.csv'))
     assign(paste0('clustMarker_', c) , tmp_markers)
+    
+    visGenes <- FeaturePlot(data.combined, features = row.names(head(tmp_markers)), min.cutoff = "q9", path = file.path(outputDir, subDir, subDir_clusterMarkers), width = 25, height=20, units ='cm')
+    ggsave(paste0('featurePlot_', c, '.pdf'), plot = visGenes, device = 'pdf')
   }
   
   #objectsToSave <- ls()[grep('clustMarker_',ls())]
@@ -144,21 +144,27 @@ for (r in resToTry){
     p_split <- DimPlot(data.combined, reduction = "umap", split.by = b)
     
     ggsave(filename = paste0('umap_batch_', b,'.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 20, height=20, units ='cm')
-    ggsave(filename = paste0('umap_batch_splitby_', b,'.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 20, height=20, units ='cm')
+    ggsave(filename = paste0('umap_batch_splitby_', b,'.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 40, height=20, units ='cm')
   }
   
-
+  
   
 }
 
 
 
-
-##  Save variables
+#  Save variables
 print('Saving variables...')
 setwd(file.path(outputDir, subDir))
 save.image(file = paste0("allVars.RData"))
 save(data.combined, file = 'seuratObj_data.combined.RData')
 
-print('~*~ All done! ~*~')
 
+# Dot plot to visualize major markers
+markers.to.plot <- c('Tuba1b', 'Pax6', 'Sox2', 'Top2a', 'Slbp', 'Rrm2', 'Eomes', 'Neurog2', 'Neurod2', 'Mapt', 'Bcl11b', 'Crym', 'Ldb2','Reln', 'Gad2', 'Sst', 'Trem2', 'Igfbp7', 'Otx2', 'Tcf7l2', 'Col1a2', 'Lum', 'Hbb.bh1')
+dp <- DotPlot(data.combined, features = rev(markers.to.plot), cols = c("blue", "red"), dot.scale = 8, 
+        split.by = "cond") + RotatedAxis()
+
+ggsave(filename = paste0('visMarkersForClusters_res', resToTry,'.pdf'), plot = dp, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 20, height=40, units ='cm')
+
+print('~*~ All done! ~*~')

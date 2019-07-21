@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=124G
 #SBATCH --partition=interactive
-#SBATCH --job-name=idealPipelineAllRes
+#SBATCH --job-name=ideal_res0.6
 #SBATCH --time=6-00:00:00
 #SBATCH --mail-user=kmuench@stanford.edu
 #SBATCH --mail-type=ALL
@@ -41,7 +41,7 @@ module load miniconda/3 # to get access to UMAP
 
 # load in paths
 #barcodeSampleLUT=/scratch/users/kmuench/output/cnv16p/201901_cluster_pooled_10x_ms/20190326_troubleshootRunthrough/determineCellSex/allNewID_cells.csv # could be demultiplexed IDs or not
-outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_noNormalizing_filter1000filter7500" # directory where output stored
+outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/20190720_s1s2_normalization_filter1000filter7500" # directory where output stored
 
 # declare for documentation purposes what these variables are
 echo 'Barcode Sample Lookup Table Location: ' $barcodeSampleLUT
@@ -53,9 +53,10 @@ echo 'Making variables...'
 Rscript 1_initializeVars.R $outputDir $METADAT_16p_SC_MS $MTX_16p_SC_MS  
 
 # Find clusters and visualize batch effects
-## (3) path To Data Combined
+## (3) path To Data Combined, (4) resolution param
+## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
 echo 'Finding clusters...'
-Rscript 2_cluster.R $outputDir $METADAT_16p_SC_MS "$outputDir/initializeVars/seuratObj_data.combined.RData"
+Rscript 2_cluster.R $outputDir $METADAT_16p_SC_MS "$outputDir/initializeVars/seuratObj_data.combined.RData" 0.6
 
 
 

@@ -242,8 +242,6 @@ if (file.exists(subDir_visFeatures)){
   setwd(file.path(outputDir, subDir, subDir_visFeatures))
 }
 
-data.combined <- wt.sal # !!!!!! REMOVE AFTER FINISHED DOING SINGLE SAMPLE
-
 ## generate feature vis graphs
 visualizeFeatures <- function(myObject){
   v <- VlnPlot(myObject, features = c("nFeature_RNA", "nCount_RNA"))
@@ -251,10 +249,10 @@ visualizeFeatures <- function(myObject){
   v2 <- VlnPlot(data.combined, features = c("nFeature_RNA", "nCount_RNA"), group.by='cond')
   f <- FeatureScatter(myObject, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
   
-  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot.pdf'), plot = v, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
-  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot_byOrigIdent.pdf'), plot = v1, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
-  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot_byCond.pdf'), plot = v2, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
-  ggsave(filename = paste0(deparse(substitute(myObject)), '_featureScatter.pdf'), plot = f, device='pdf', path = file.path(outputDir, subDir), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot.pdf'), plot = v, device='pdf', path = file.path(outputDir, subDir, subDir_visFeatures), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot_byOrigIdent.pdf'), plot = v1, device='pdf', path = file.path(outputDir, subDir, subDir_visFeatures), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_vlnPlot_byCond.pdf'), plot = v2, device='pdf', path = file.path(outputDir, subDir, subDir_visFeatures), width = 30, height=20, units ='cm')
+  ggsave(filename = paste0(deparse(substitute(myObject)), '_featureScatter.pdf'), plot = f, device='pdf', path = file.path(outputDir, subDir, subDir_visFeatures), width = 30, height=20, units ='cm')
   
 }
 
@@ -278,26 +276,32 @@ if (file.exists(subDir_jackstraw)){
   setwd(file.path(outputDir, subDir, subDir_jackstraw))
 }
 
-## perform jackstraw for each individual object
-for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
-  ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
-  ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=80) #!! ERROR: max(nu, nv) must be positive
-  ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=80)
-  ds_explore <- ScoreJackStraw(ds_explore, dims = 30:70) #looking for where sharp dropoff
-  j <- JackStrawPlot(ds_explore, dims = 30:70)
-  ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir), width = 30, height=12, units ='cm')
-}
-
 
 # save variables
 print('saving variables...')
 setwd(file.path(outputDir, subDir))
-save.image(file = paste0("allVars.RData"))
+save.image(file = paste0("vars_beforeJackStraw.RData"))
 save(wt.sal, file = 'seuratObj_wt.sal.RData')
 save(wt.lps, file = 'seuratObj_wt.lps.RData')
 save(het.sal, file = 'seuratObj_het.sal.RData')
 save(het.lps, file = 'seuratObj_het.lps.RData')
 save(data.combined, file = 'seuratObj_data.combined.RData')
+
+
+## perform jackstraw for each individual object
+for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
+  print(paste0('Jackstraw for ', ds))
+  print('Scale and PCA...')
+  ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
+  ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=70)
+  print('JackStraw...')
+  ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=69)
+  ds_explore <- ScoreJackStraw(ds_explore, dims = 1:65) #looking for where sharp dropoff
+  j <- JackStrawPlot(ds_explore, dims = 1:65)
+  ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir, subDir_jackstraw), width = 30, height=12, units ='cm')
+}
+
+save.image(file = paste0("vars_afterJackStraw.RData"))
 
 
 print('~*~ All done! ~*~')
