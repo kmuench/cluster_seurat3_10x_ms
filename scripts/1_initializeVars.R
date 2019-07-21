@@ -34,9 +34,9 @@ packageVersion('ggplot2')
 # import from command line
 args <- commandArgs(TRUE)
 #load(args[1])
-mtxPath <- args[1]
+mtxPath <- args[3]
 metadataPath <- args[2]
-outputDir <- args[3]
+outputDir <- args[1]
 #altID_cells_path <- args[4]
 
 # #Uncomment if you want to only focus on a subset of clusters
@@ -90,6 +90,9 @@ list.filenames.wt.lps <- files[files$ids %in% metadata[metadata$Group == 'WT.LPS
 list.filenames.het.sal <- files[files$ids %in% metadata[metadata$Group == 'HET.SAL','SampleID'], 'filenames']
 list.filenames.het.lps <- files[files$ids %in% metadata[metadata$Group == 'HET.LPS','SampleID'], 'filenames']
 
+print(files)
+print(list.filenames.wt.sal)
+
 # # load subclustering IDs
 # load('/scratch/users/kmuench/output/cnv16p/201901_cluster_pooled_10x_ms/20190329_troubleshootRunthrough_demux/groupCompare/subclust_IDs_c4_2_0_5.RData') # interneurons and dienceph
 # subclust_IDs <- tst
@@ -132,12 +135,13 @@ myCondSeurat <- function(filenames, mtxPath, condName, files, minCells, nFeature
     # filter out cells if desired for this round
     data_tmp <- subset(data_tmp, subset = nFeature_RNA > 1000 & nFeature_RNA < 7500) # numbers need to be typed in
     
+    
     # LIST OF CELLS TO REMOVE GOES HERE
     # subset(data_tmp, cell_id %in% (putative doublets))
     
     # normalize data and find variable featuers
     print('Normalize the data...')
-    data_tmp <- NormalizeData(data_tmp, verbose = FALSE)
+    #data_tmp <- NormalizeData(data_tmp, verbose = FALSE)
     #secondData_obj <- NormalizeData(secondData_obj, verbose = FALSE)
     print('Find variable features data...')
     data_tmp <- FindVariableFeatures(data_tmp, selection.method = "vst", nfeatures = nFeatures_chosen)
@@ -190,7 +194,7 @@ wt.lps <- myCondSeurat(filenames = list.filenames.wt.lps,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
-wt.lps <- FindVariableFeatures(wt.lps, selection.method = "vst", nfeatures = nFeatures_chosen)
+wt.lps <- FindVariableFeatures(wt.lps, selection.method = "vst", nfeatures = 2000)
 
 
 het.sal <- myCondSeurat(filenames = list.filenames.het.sal, 
@@ -200,7 +204,7 @@ het.sal <- myCondSeurat(filenames = list.filenames.het.sal,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
-het.sal <- FindVariableFeatures(het.sal, selection.method = "vst", nfeatures = nFeatures_chosen)
+het.sal <- FindVariableFeatures(het.sal, selection.method = "vst", nfeatures = 2000)
 
 
 het.lps <- myCondSeurat(filenames = list.filenames.het.lps, 
@@ -210,7 +214,7 @@ het.lps <- myCondSeurat(filenames = list.filenames.het.lps,
                        minCells = 3, 
                        nFeatures_chosen = 2000,
                        nFeature_RNA_thresh = TRUE)
-het.lps <- FindVariableFeatures(het.lps, selection.method = "vst", nfeatures = nFeatures_chosen)
+het.lps <- FindVariableFeatures(het.lps, selection.method = "vst", nfeatures = 2000)
 
 # Print what is in each one
 print('Samples included in each variable:')
