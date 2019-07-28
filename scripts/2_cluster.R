@@ -82,14 +82,14 @@ print('Running UMAP and finding neighbors...')
 data.combined <- RunUMAP(data.combined, reduction = "pca", dims = 1:49)
 data.combined <- FindNeighbors(data.combined, reduction = "pca", dims = 1:49)
 
-save(data.combined, file = 'seuratObj_data.combined_beforeClustering.RData')
+save(data.combined, file = paste0('seuratObj_data.combined_beforeClustering_res', resToTry, '.RData') )
 
 ## Find clusters for list of resolutions
 print('Finding clusters...')
 
 for (r in resToTry){
   print(paste0('Finding clusters for resolution = ', r))
-  data.combined <- FindClusters(data.combined, resolution = r)
+  data.combined <- FindClusters(data.combined, resolution = as.numeric(r))
   
   ##Visualize
   p_labels <- DimPlot(data.combined, reduction = "umap", label = TRUE)
@@ -118,8 +118,8 @@ for (r in resToTry){
     write.csv(tmp_markers, file = paste0('clustMarker_',c, '.csv'))
     assign(paste0('clustMarker_', c) , tmp_markers)
     
-    visGenes <- FeaturePlot(data.combined, features = row.names(head(tmp_markers)), min.cutoff = "q9", path = file.path(outputDir, subDir, subDir_clusterMarkers), width = 25, height=20, units ='cm')
-    ggsave(paste0('featurePlot_', c, '.pdf'), plot = visGenes, device = 'pdf')
+    visGenes <- FeaturePlot(data.combined , features = row.names(head(tmp_markers)) , min.cutoff = "q9")
+    ggsave(paste0('featurePlot_', c, '.pdf'), plot = visGenes, device = 'pdf', path = file.path(outputDir, subDir, subDir_clusterMarkers), width = 25, height=20, units ='cm')
   }
   
   #objectsToSave <- ls()[grep('clustMarker_',ls())]
@@ -156,12 +156,12 @@ for (r in resToTry){
 #  Save variables
 print('Saving variables...')
 setwd(file.path(outputDir, subDir))
-save.image(file = paste0("allVars.RData"))
-save(data.combined, file = 'seuratObj_data.combined.RData')
+save.image(file = paste0(paste0("allVars_res", resToTry, ".RData")))
+save(data.combined, file = 'seuratObj_data.combined_res', resToTry, '.RData')
 
 
 # Dot plot to visualize major markers
-markers.to.plot <- c('Tuba1b', 'Pax6', 'Sox2', 'Top2a', 'Slbp', 'Rrm2', 'Eomes', 'Neurog2', 'Neurod2', 'Mapt', 'Bcl11b', 'Crym', 'Ldb2','Reln', 'Gad2', 'Sst', 'Trem2', 'Igfbp7', 'Otx2', 'Tcf7l2', 'Col1a2', 'Lum', 'Hbb.bh1')
+markers.to.plot <- c('Tuba1b', 'Pax6', 'Sox2', 'Top2a', 'Slbp', 'Rrm2', 'Eomes', 'Neurog2', 'Neurod2', 'Mapt', 'Bcl11b', 'Crym', 'Ldb2','Reln', 'Gad2', 'Sst', 'Trem2', 'Igfbp7', 'Otx2', 'Tcf7l2', 'Col1a2', 'Lum', 'Hbb-bh1')
 dp <- DotPlot(data.combined, features = rev(markers.to.plot), cols = c("blue", "red"), dot.scale = 8, 
         split.by = "cond") + RotatedAxis()
 

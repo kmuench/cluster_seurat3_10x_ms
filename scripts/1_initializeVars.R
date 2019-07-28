@@ -49,7 +49,7 @@ outputDir <- args[1]
 # altID_cells_path <- read.csv("/scratch/users/kmuench/output/cnv16p/201901_cluster_pooled_10x_ms/20190219_makeSparse/20190226_sexLabel/allNewID_cells.csv")
 # altID_cells <- read.csv("/labs/tpalmer/projects/cnv16p/data/scRNASeq/mouse/metadata/originalSampleBarcodeLUT.csv")
 
-# !!!!! START HERE
+## Announce where paths are
 
 print('Run : 1_initializeVars.R')
 print(paste0('Mtx File location: ', mtxPath))
@@ -132,7 +132,8 @@ myCondSeurat <- function(filenames, mtxPath, condName, files, minCells, nFeature
     data_tmp$orig.ident <- files_relevant[i,'ids'] # Add sample IDs
     
     # filter out cells if desired for this round
-    data_tmp <- subset(data_tmp, subset = nFeature_RNA > 1000 & nFeature_RNA < 7500) # numbers need to be typed in
+    #data_tmp <- subset(data_tmp, subset = nFeature_RNA > 1000 & nFeature_RNA < 7500) # numbers need to be typed in
+    data_tmp <- subset(data_tmp) # uncomment if you don't want to include cell filtering
     
     # LIST OF CELLS TO REMOVE GOES HERE
     # subset(data_tmp, cell_id %in% (putative doublets))
@@ -140,6 +141,7 @@ myCondSeurat <- function(filenames, mtxPath, condName, files, minCells, nFeature
     # normalize data and find variable featuers
     print('Normalize the data...')
     data_tmp <- NormalizeData(data_tmp, verbose = FALSE)
+    #data_tmp <- NormalizeData(data_tmp, normalization.method = "RC", verbose = FALSE) # for some reason w this version HET.SAL breaks??
 
     print('Find variable features data...')
     data_tmp <- FindVariableFeatures(data_tmp, selection.method = "vst", nfeatures = nFeatures_chosen)
@@ -266,15 +268,15 @@ visualizeFeatures(data.combined)
 # Use Jackstraw plots to determine the dimensionality of data and back-justify better dimensions for data anchors
 ## justification: estimated number using https://github.com/satijalab/seurat/issues/1248
 
-## create subdirectory to store output
-subDir_jackstraw <- 'jackstraw'
-setwd(file.path(outputDir, subDir))
-if (file.exists(subDir_jackstraw)){
-  setwd(file.path(outputDir, subDir,subDir_jackstraw))
-} else {
-  dir.create(file.path(outputDir, subDir, subDir_jackstraw))
-  setwd(file.path(outputDir, subDir, subDir_jackstraw))
-}
+# ## create subdirectory to store output
+# subDir_jackstraw <- 'jackstraw'
+# setwd(file.path(outputDir, subDir))
+# if (file.exists(subDir_jackstraw)){
+#   setwd(file.path(outputDir, subDir,subDir_jackstraw))
+# } else {
+#   dir.create(file.path(outputDir, subDir, subDir_jackstraw))
+#   setwd(file.path(outputDir, subDir, subDir_jackstraw))
+# }
 
 
 # save variables
@@ -286,25 +288,25 @@ save(wt.lps, file = 'seuratObj_wt.lps.RData')
 save(het.sal, file = 'seuratObj_het.sal.RData')
 save(het.lps, file = 'seuratObj_het.lps.RData')
 save(data.combined, file = 'seuratObj_data.combined.RData')
-
-
-## perform jackstraw for each individual object
-for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
-  print(paste0('Jackstraw for ', ds))
-  print('Scale and PCA...')
-  ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
-  ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=70)
-  print('JackStraw...')
-  ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=69)
-  ds_explore <- ScoreJackStraw(ds_explore, dims = 1:65) #looking for where sharp dropoff
-  j <- JackStrawPlot(ds_explore, dims = 1:65)
-  ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir, subDir_jackstraw), width = 30, height=12, units ='cm')
-}
-
-save.image(file = paste0("vars_afterJackStraw.RData"))
-
-
 print('~*~ All done! ~*~')
+
+
+# ## perform jackstraw for each individual object
+# for (ds in c('wt.sal', 'wt.lps', 'het.sal', 'het.lps')){
+#   print(paste0('Jackstraw for ', ds))
+#   print('Scale and PCA...')
+#   ds_explore <- ScaleData(eval(parse(text=ds)), features = rownames(eval(parse(text=ds))) )
+#   ds_explore <- RunPCA(ds_explore, features = VariableFeatures(object = ds_explore), npcs=70)
+#   print('JackStraw...')
+#   ds_explore <- JackStraw(ds_explore, num.replicate = 100, dims=69)
+#   ds_explore <- ScoreJackStraw(ds_explore, dims = 1:65) #looking for where sharp dropoff
+#   j <- JackStrawPlot(ds_explore, dims = 1:65)
+#   ggsave(filename = paste0(ds, '_jackstraw.tiff'), plot = j, device='tiff', path = file.path(outputDir, subDir, subDir_jackstraw), width = 30, height=12, units ='cm')
+# }
+# 
+# save.image(file = paste0("vars_afterJackStraw.RData"))
+
+
 
 
 
