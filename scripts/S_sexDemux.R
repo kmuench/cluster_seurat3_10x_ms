@@ -78,14 +78,15 @@ data_norm_knownSex <- subset(data.combined,
 data_norm_knownSex@meta.data$Sex <- 'M'
 data_norm_knownSex@meta.data[which(row.names(data_norm_knownSex@meta.data) %in% cells_F),'Sex'] <- 'F'
 
-data_norm_M <- data_norm_knownSex[,colnames(data_norm_knownSex) %in% cells_M]
-data_norm_F <- data_norm_knownSex[,colnames(data_norm_knownSex) %in% cells_F]
-data_sexGenes <- data_norm_knownSex[which(row.names(data_norm_knownSex) %in% sexGenes_uniqList),]
+data_norm_knownSex_exprs <- FetchData(data_norm_knownSex, vars = sexGenes_uniqList)
+data_norm_M <- data_norm_knownSex_exprs[rownames(data_norm_knownSex_exprs) %in% cells_M,]
+data_norm_F <- data_norm_knownSex_exprs[rownames(data_norm_knownSex_exprs) %in% cells_F,]
+#data_sexGenes <- data_norm_knownSex[which(row.names(data_norm_knownSex) %in% sexGenes_uniqList),]
 
 ## Find average gene expression for sex genes
-geneAvgs <- data.frame(Male = rowMeans(data_norm_M), Female = rowMeans(data_norm_F))
+geneAvgs <- data.frame(Male = colMeans(data_norm_M), Female = colMeans(data_norm_F))
 geneAvgs$delta <- abs((geneAvgs$Male - geneAvgs$Female))/(geneAvgs$Male + geneAvgs$Female) # which genes have the largest scaled difference between the M and F average?
-sexGeneAvgs <- geneAvgs[which(row.names(geneAvgs) %in% sexGenes_uniqList),] # only look at sex genes
+#sexGeneAvgs <- geneAvgs[which(row.names(geneAvgs) %in% sexGenes_uniqList),] # only look at sex genes
 
 ## visualize gene candidates in the subset of data that is for known samples
 ### Older gene candidates - uncomment to view
@@ -110,34 +111,74 @@ ggsave(filename = paste0(paste0('vlnPlot_chosenSexGenes.pdf')),
 
 ## visualize expression of X-linked genes in tSNE - X = genes, Y=sample
 data.combined_small <- subset(data.combined, 
-                              cells = row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% c('KM2','J','I','K','H','M'),]) ) # note that I am plotting RAW COUNTS here
-fp_chosenSexGenes <- FeaturePlot(data.combined_small, features = chosenSexGenes, split.by = "orig.ident")
+                              cells = row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% c('I','K','KM13','KM18','M'),]) ) # note that I am plotting RAW COUNTS here
+fp_chosenSexGenes <- FeaturePlot(data.combined_small[['RNA']], features = chosenSexGenes, split.by = "orig.ident", slot = "counts")
 ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')), 
        plot = fp_chosenSexGenes, device='pdf', 
        path = file.path(outputDir, subDir), 
-       width = 20, height=20, units ='cm')
-
-## ROC curve to select expression threshold for Chosen Genes
+       width = 40, height=20, units ='cm')
 
 
-# Characterize those sex-linked genes
+## ROC curve to select expression threshold for Chosen Genes 
+library('plotROC')
 
-## In singlets, how many cells are...
+### prepare ROC curve plot data
+plotROC <- data.frame(cellName = row.names(data_sexGenes@meta.data), Sex = data_sexGenes@meta.data$Sex)
+chosenSexGene_exprs <- FetchData(data_norm_knownSex[['RNA']], vars = chosenSexGenes, slot = "counts")
+plotROC <- merge(plotROC, chosenSexGene_exprs, by.x = 'cellName', by.y = 'row.names')
+plotROC$binarySexLabel <- 0
+plotROC[which(plotROC$Sex == 'F'), 'binarySexLabel'] <- 1
 
-### Xist+, Y1+ AND Y2+?
-### Xist+, Y1+ OR Y2+?
-### Xist+, Y1- AND Y2-?
-### Xist-, Y1+ OR Y2+?
-### Xist-, Y1+ OR Y2+?
-### Xist-, Y1- AND Y2-?
-### Xist-, Y1- OR Y2-?
+longroc <- melt_roc(plotROC, "binarySexLabel", c("Xist", "Eif2s3y", "Ddx3y"))
+
+plotThreeROC <- ggplot(longroc, aes(d = D, m = M, color = name)) + geom_roc(cutoffs.at = c(0, 0.5, 1, 1.75, 7, 13)) + style_roc()
+ggsave(filename = paste0(paste0('ROC_curve.pdf')), 
+       plot = plotThreeROC, device='pdf', 
+       path = file.path(outputDir, subDir), 
+       width = 25, height=15, units ='cm')
+
+### choose a threshold
+
+thresh_Xist <- 1
+thresh_Eif2s3y <- 0
+thresh_Ddx3y <-0
 
 
-# Determine what typical expression is in singlets
+# Characterize cells with low and high Xist in the known sex (singlet) cells
 
-## Violin plot - Xist vs other two
+plotROC$y1_or_y2 <- 'FALSE'
+plotROC[which(plotROC$Ddx3y > thresh_Ddx3y | plotROC$Eif2s3y > thresh_Eif2s3y),'y1_or_y2'] <- 'TRUE'
 
-## What number of cells in each range?
+plotROC$y1_and_y2 <- 'FALSE'
+plotROC[which( (plotROC$Ddx3y > thresh_Ddx3y) & (plotROC$Eif2s3y > thresh_Eif2s3y) ),'y1_and_y2'] <- 'TRUE'
+
+## How many cells have each combination of markers?
+### NOTE: WORKS BEST WHEN THE Y-MARKERS ARE <= AND XIST IS >
+plotROC %>% group_by(Sex) %>% count(Xist>thresh_Xist)
+plotROC %>% group_by(Sex) %>% count(Ddx3y>thresh_Ddx3y)
+plotROC %>% group_by(Sex) %>% count(Eif2s3y>thresh_Eif2s3y)
+
+## How many cells are Xist+ but...
+### Y1+ AND Y2+?
+count_bins <- plotROC %>% group_by(Sex) %>% count(Xist>thresh_Xist,y1_and_y2, y1_or_y2)
+write.csv(count_bins, file = paste0('counts_knownSexSamples_xistThresh', thresh_Xist, '_EifThresh', thresh_Eif2s3y, '_DdxThresh', thresh_Ddx3y, '.csv') )
+
+
+## Of the cells that are triple negative, what cell types do they fall under?
+
+
+
+# Apply this scheme to the pooled samples
+
+## Are there any cells that have both Xist above thresh and at least one Y-markers above thresh?
+
+### find doublets
+
+
+### visualize where they are located
+
+
+
 
 # Create factor for whether or not something is expressed
 
@@ -161,3 +202,5 @@ ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')),
 # Generate list of M and F samples
 
 # Rename samples, redo datafame?
+
+
