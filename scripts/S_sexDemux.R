@@ -56,6 +56,7 @@ cells_M <- row.names(data.combined@meta.data[data.combined@meta.data$orig.ident 
 cells_F <- row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% knownF,])
 cells_unk  <- row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% pooled,])
   
+
 # Create folder to store output
 setwd(outputDir)
 subDir <- 'sexDemux'
@@ -68,51 +69,52 @@ if (file.exists(subDir)){
 }
 
 
-# Boxplot of sex genes detected in dataset
-data_norm <- data.frame(GetAssayData(object = data.combined, assay = "RNA", slot = "data"))
-data_norm_M <- data_norm[,colnames(data_norm) %in% cells_M]
-data_norm_F <- data_norm[,colnames(data_norm) %in% cells_F]
 
-#genesInData <- data.combined@assays$RNA@data@Dimnames[[1]]
-#data.combined_sexGenes_inData <- subset(genesInData, subset = sexGenes_uniqList %in% genesInData)
-data_sexGenes <- data_norm[which(row.names(data_norm) %in% sexGenes_uniqList),]
+# Select discriminating genes to use
 
-#data.combined_sexGenes <- subset(data.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+## Normalized data matrices
+data_norm_knownSex <- subset(data.combined, 
+                             cells = c(cells_M, cells_F) ) # note that I am plotting RAW COUNTS here
+data_norm_knownSex@meta.data$Sex <- 'M'
+data_norm_knownSex@meta.data[which(row.names(data_norm_knownSex@meta.data) %in% cells_F),'Sex'] <- 'F'
 
+data_norm_M <- data_norm_knownSex[,colnames(data_norm_knownSex) %in% cells_M]
+data_norm_F <- data_norm_knownSex[,colnames(data_norm_knownSex) %in% cells_F]
+data_sexGenes <- data_norm_knownSex[which(row.names(data_norm_knownSex) %in% sexGenes_uniqList),]
+
+## Find average gene expression for sex genes
 geneAvgs <- data.frame(Male = rowMeans(data_norm_M), Female = rowMeans(data_norm_F))
-geneAvgs$delta <- abs((geneAvgs$Male - geneAvgs$Female))/(geneAvgs$Male + geneAvgs$Female)
-sexGeneAvgs <- geneAvgs[which(row.names(geneAvgs) %in% sexGenes_uniqList),]
+geneAvgs$delta <- abs((geneAvgs$Male - geneAvgs$Female))/(geneAvgs$Male + geneAvgs$Female) # which genes have the largest scaled difference between the M and F average?
+sexGeneAvgs <- geneAvgs[which(row.names(geneAvgs) %in% sexGenes_uniqList),] # only look at sex genes
 
-## visualize in the subset of known samples
-data.combined_knownSex <- subset(GetAssayData(object = data.combined, assay = "RNA", slot = "counts"), cells = c(cells_M, cells_F)) # note that I am plotting RAW COUNTS here
-data.combined_knownSex@meta.data$Sex <- 'M'
-data.combined_knownSex@meta.data[which(row.names(data.combined_knownSex@meta.data) %in% cells_F),'Sex'] <- 'F'
+## visualize gene candidates in the subset of data that is for known samples
+### Older gene candidates - uncomment to view
+# plots <- VlnPlot(data_norm_knownSex, features = c("Uty", 'H2afb1','Magix', 'Ddx3y','Tsix','Kdm5d'), split.by = "Sex", group.by = "cond",
+#         pt.size = 0, combine = FALSE, slot = 'RNA')
+# CombinePlots(plots = plots, ncol = 1)
+# 
+# plots2 <- VlnPlot(data_norm_knownSex, features = c("Xist", "Eif2s3y", "Eif2s3x", "Hmgb3", "Tmsb4x"), split.by = "Sex", group.by = "orig.ident",
+#         pt.size = 0, combine = FALSE, slot = 'RNA')
+# CombinePlots(plots = plots2, ncol = 1)
 
-plots <- VlnPlot(data.combined_knownSex, features = c("Uty", 'H2afb1','Magix', 'Ddx3y','Tsix','Kdm5d'), split.by = "Sex", group.by = "cond",
-        pt.size = 0, combine = FALSE)
-CombinePlots(plots = plots, ncol = 1)
+### Choose genes that look most promising
+chosenSexGenes <- c('Xist', 'Ddx3y', 'Eif2s3y')
 
-plots2 <- VlnPlot(data.combined_knownSex, features = c("Xist", "Eif2s3y", "Eif2s3x", "Hmgb3", "Tmsb4x"), split.by = "Sex", group.by = "orig.ident",
-        pt.size = 0, combine = FALSE)
-CombinePlots(plots = plots2, ncol = 1)
+demoPlots <- VlnPlot(data_norm_knownSex, features = chosenSexGenes, split.by = "Sex", group.by = "orig.ident",
+                     pt.size = 0, combine = FALSE, assay = 'RNA') # include assay flag to use non-normalized data
+demoPlots_toSave <- CombinePlots(plots = demoPlots, ncol = 3)
+ggsave(filename = paste0(paste0('vlnPlot_chosenSexGenes.pdf')), 
+       plot = demoPlots_toSave, device='pdf', 
+       path = file.path(outputDir, subDir), 
+       width = 45, height=15, units ='cm')
 
-demoPlots <- VlnPlot(data.combined_knownSex, features = c('Ddx3y', 'Xist', 'Eif2s3y'), split.by = "Sex", group.by = "orig.ident",
-                     pt.size = 0, combine = FALSE)
-CombinePlots(plots = demoPlots, ncol = 1)
+## visualize expression of X-linked genes in tSNE - X = genes, Y=sample
+FeaturePlot(data.combined, features = chosenSexGenes, group.by = "cond")
 
-# visualize expression of X-linked genes in tSNE
-
-## X = genes, Y=sample
-FeaturePlot(data.combined, features = c('Xist', 'Ddx3y', 'Eif2s3y'))
+## ROC curve to select expression threshold for Chosen Genes
 
 
-# Determine what typical expression is in singlets
-
-## Violin plot - Xist vs other two
-
-## What number of cells in each range?
-
-# Create factor for whether or not something is expressed
+# Characterize those sex-linked genes
 
 ## In singlets, how many cells are...
 
@@ -123,6 +125,17 @@ FeaturePlot(data.combined, features = c('Xist', 'Ddx3y', 'Eif2s3y'))
 ### Xist-, Y1+ OR Y2+?
 ### Xist-, Y1- AND Y2-?
 ### Xist-, Y1- OR Y2-?
+
+
+# Determine what typical expression is in singlets
+
+## Violin plot - Xist vs other two
+
+## What number of cells in each range?
+
+# Create factor for whether or not something is expressed
+
+
 
 
 ## Of the F cells that are Xist-, 
