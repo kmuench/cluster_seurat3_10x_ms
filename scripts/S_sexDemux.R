@@ -109,7 +109,13 @@ ggsave(filename = paste0(paste0('vlnPlot_chosenSexGenes.pdf')),
        width = 45, height=15, units ='cm')
 
 ## visualize expression of X-linked genes in tSNE - X = genes, Y=sample
-FeaturePlot(data.combined, features = chosenSexGenes, group.by = "cond")
+data.combined_small <- subset(data.combined, 
+                              cells = row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% c('KM2','J','I','K','H','M'),]) ) # note that I am plotting RAW COUNTS here
+fp_chosenSexGenes <- FeaturePlot(data.combined_small, features = chosenSexGenes, split.by = "orig.ident")
+ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')), 
+       plot = fp_chosenSexGenes, device='pdf', 
+       path = file.path(outputDir, subDir), 
+       width = 20, height=20, units ='cm')
 
 ## ROC curve to select expression threshold for Chosen Genes
 
