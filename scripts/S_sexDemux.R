@@ -221,6 +221,17 @@ makePieChart(tripleNegCells, 'nFeature_RNA_category') # so most of these cells i
 
 # Apply this scheme to the pooled samples
 
+## cell IDs with Xist > 1
+exprs <- FetchData(data.combined[['RNA']], vars = chosenSexGenes, slot = "counts")
+cells_above_thresh_Xist <-row.names(exprs[which(exprs$Xist > thresh_Xist),])
+
+data.combined@meta.data$Sex <- 'M'
+data.combined@meta.data[which(row.names(data.combined@meta.data) %in% cells_above_thresh_Xist),'Sex'] <- 'F'
+data.combined@meta.data[which(row.names(data.combined@meta.data) %in% cells_F), 'Sex'] <- 'F' # for those 102 ambiguous cells, can take advantage of the fact that we already know label
+
+
+data.combined@meta.data$sample <- orig.sample + Sex
+cells_unk
 
 
 ## Are there any cells that have both Xist above thresh and at least one Y-markers above thresh?
