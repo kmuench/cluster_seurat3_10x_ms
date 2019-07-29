@@ -165,10 +165,63 @@ write.csv(count_bins, file = paste0('counts_knownSexSamples_xistThresh', thresh_
 
 
 ## Of the cells that are triple negative, what cell types do they fall under?
+### We want to know if we call all triple negative cells Male which female cell types that will affect
+tripleNegCells <- data.frame(cellName = plotROC[ which( !((plotROC$Xist > thresh_Xist)) & (plotROC$y1_or_y2 == 'FALSE') & (plotROC$Sex == 'F') ) , 'cellName'] )
+tripleNegCells <- data.combined@meta.data[match( tripleNegCells$cellName, row.names(data.combined@meta.data) ) , c("seurat_clusters", "CellsPerSample", "nFeature_RNA") ]
+
+tripleNegCells <- tripleNegCells %>% mutate(nFeature_RNA_category=cut(nFeature_RNA, breaks=c(-Inf, 2045, 3053, Inf), labels=c("low","middle","high")))
+
+
+## make pie chart
+### tips: http://www.sthda.com/english/wiki/ggplot2-pie-chart-quick-start-guide-r-software-and-data-visualization
+makePieChart <- function(tripleNegCells, clusterBy){
+  # prep data
+  pieData <- tripleNegCells %>% group_by_at(clusterBy) %>% tally()
+  pieData$percent <- (pieData$n / sum(pieData$n) )*100
+  
+  pieData$labels <- apply(pieData[,clusterBy], 2, function(x) paste0(x, ' [', round(pieData$percent, 2), '%]') )
+  
+  pieData <- pieData[rev(order(pieData$percent)),]
+  pieData$labels <- factor(pieData$labels, levels = pieData$labels)
+  
+  # blank theme for pie chart
+  blank_theme <- theme_minimal()+
+    theme(
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      panel.border = element_blank(),
+      panel.grid=element_blank(),
+      axis.ticks = element_blank(),
+      plot.title=element_text(size=14, face="bold")
+    )
+  
+  # make pie
+  p <- ggplot(pieData, aes_string(x=factor(1), y='percent', fill='labels')) +
+    geom_bar(width = 1, stat = "identity", color = "black") + 
+    coord_polar("y", start=0) +
+    theme_minimal() +
+    theme(axis.text.x=element_blank()) +
+    blank_theme
+    
+    # add when you have colors decided:
+    #scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9"))
+  
+  print(p)
+  ggsave(filename = paste0(paste0('pieChart_F_tripleNeg_groupby', clusterBy, '.pdf')), 
+         plot = p, device='pdf', 
+         path = file.path(outputDir, subDir), 
+         width = 30, height=15, units ='cm')
+}
+
+makePieChart(tripleNegCells, 'seurat_clusters')
+makePieChart(tripleNegCells, 'CellsPerSample')
+makePieChart(tripleNegCells, 'nFeature_RNA_category') # so most of these cells in the lowest third of expression
 
 
 
 # Apply this scheme to the pooled samples
+
+
 
 ## Are there any cells that have both Xist above thresh and at least one Y-markers above thresh?
 
