@@ -26,6 +26,8 @@ print(paste0('Ggplot2 package Version: ', packageVersion('ggplot2')) )
 
 
 # import data
+print('Beginning R Script, importing data...')
+
 
 ## import paths from command line
 args <- commandArgs(TRUE)
@@ -69,8 +71,8 @@ if (file.exists(subDir)){
 }
 
 
-
 # Select discriminating genes to use
+print('Selecting discriminating genes to use...')
 
 ## Normalized data matrices
 data_norm_knownSex <- subset(data.combined, 
@@ -98,9 +100,10 @@ geneAvgs$delta <- abs((geneAvgs$Male - geneAvgs$Female))/(geneAvgs$Male + geneAv
 #         pt.size = 0, combine = FALSE, slot = 'RNA')
 # CombinePlots(plots = plots2, ncol = 1)
 
-### Choose genes that look most promising
+## Choose genes that look most promising
 chosenSexGenes <- c('Xist', 'Ddx3y', 'Eif2s3y')
 
+## Visualize in violin plot what those discriminating genes look like
 demoPlots <- VlnPlot(data_norm_knownSex, features = chosenSexGenes, split.by = "Sex", group.by = "orig.ident",
                      pt.size = 0, combine = FALSE, assay = 'RNA') # include assay flag to use non-normalized data
 demoPlots_toSave <- CombinePlots(plots = demoPlots, ncol = 3)
@@ -112,7 +115,8 @@ ggsave(filename = paste0(paste0('vlnPlot_chosenSexGenes.pdf')),
 ## visualize expression of X-linked genes in tSNE - X = genes, Y=sample
 data.combined_small <- subset(data.combined, 
                               cells = row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% c('I','K','KM13','KM18','M'),]) ) # note that I am plotting RAW COUNTS here
-fp_chosenSexGenes <- FeaturePlot(data.combined_small[['RNA']], features = chosenSexGenes, split.by = "orig.ident", slot = "counts")
+fp_chosenSexGenes <- FeaturePlot(data.combined[['RNA']], features = chosenSexGenes, split.by = "orig.ident", slot = "counts")
+
 ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')), 
        plot = fp_chosenSexGenes, device='pdf', 
        path = file.path(outputDir, subDir), 
@@ -120,10 +124,11 @@ ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')),
 
 
 ## ROC curve to select expression threshold for Chosen Genes 
+print('Plotting ROC curve...')
 library('plotROC')
 
 ### prepare ROC curve plot data
-plotROC <- data.frame(cellName = row.names(data_sexGenes@meta.data), Sex = data_sexGenes@meta.data$Sex)
+plotROC <- data.frame(cellName = row.names(data_norm_knownSex@meta.data), Sex = data_norm_knownSex@meta.data$Sex)
 chosenSexGene_exprs <- FetchData(data_norm_knownSex[['RNA']], vars = chosenSexGenes, slot = "counts")
 plotROC <- merge(plotROC, chosenSexGene_exprs, by.x = 'cellName', by.y = 'row.names')
 plotROC$binarySexLabel <- 0
@@ -131,20 +136,20 @@ plotROC[which(plotROC$Sex == 'F'), 'binarySexLabel'] <- 1
 
 longroc <- melt_roc(plotROC, "binarySexLabel", c("Xist", "Eif2s3y", "Ddx3y"))
 
-plotThreeROC <- ggplot(longroc, aes(d = D, m = M, color = name)) + geom_roc(cutoffs.at = c(0, 0.5, 1, 1.75, 7, 13)) + style_roc()
+plotThreeROC <- ggplot(longroc, aes(d = D, m = M, color = name)) + geom_roc(cutoffs.at = c(0, 0.5, 1, 3, 7, 13)) + style_roc()
 ggsave(filename = paste0(paste0('ROC_curve.pdf')), 
        plot = plotThreeROC, device='pdf', 
        path = file.path(outputDir, subDir), 
        width = 25, height=15, units ='cm')
 
 ### choose a threshold
-
 thresh_Xist <- 1
 thresh_Eif2s3y <- 0
 thresh_Ddx3y <-0
 
 
-# Characterize cells with low and high Xist in the known sex (singlet) cells
+# Characterize cells with low and high Xist in the known sex (single sample) cells
+print('Characterizing the cells with low and high Xist in the singly-sequenced samples...')
 
 plotROC$y1_or_y2 <- 'FALSE'
 plotROC[which(plotROC$Ddx3y > thresh_Ddx3y | plotROC$Eif2s3y > thresh_Eif2s3y),'y1_or_y2'] <- 'TRUE'
@@ -158,8 +163,7 @@ plotROC %>% group_by(Sex) %>% count(Xist>thresh_Xist)
 plotROC %>% group_by(Sex) %>% count(Ddx3y>thresh_Ddx3y)
 plotROC %>% group_by(Sex) %>% count(Eif2s3y>thresh_Eif2s3y)
 
-## How many cells are Xist+ but...
-### Y1+ AND Y2+?
+## Count how many cells fall into each possible combination of Xist, Eif2s3y, and Ddx3y expression
 count_bins <- plotROC %>% group_by(Sex) %>% count(Xist>thresh_Xist,y1_and_y2, y1_or_y2)
 write.csv(count_bins, file = paste0('counts_knownSexSamples_xistThresh', thresh_Xist, '_EifThresh', thresh_Eif2s3y, '_DdxThresh', thresh_Ddx3y, '.csv') )
 
@@ -172,8 +176,8 @@ tripleNegCells <- data.combined@meta.data[match( tripleNegCells$cellName, row.na
 tripleNegCells <- tripleNegCells %>% mutate(nFeature_RNA_category=cut(nFeature_RNA, breaks=c(-Inf, 2045, 3053, Inf), labels=c("low","middle","high")))
 
 
-## make pie chart
-### tips: http://www.sthda.com/english/wiki/ggplot2-pie-chart-quick-start-guide-r-software-and-data-visualization
+### make pie chart
+#### tips: http://www.sthda.com/english/wiki/ggplot2-pie-chart-quick-start-guide-r-software-and-data-visualization
 makePieChart <- function(tripleNegCells, clusterBy){
   # prep data
   pieData <- tripleNegCells %>% group_by_at(clusterBy) %>% tally()
@@ -220,6 +224,7 @@ makePieChart(tripleNegCells, 'nFeature_RNA_category') # so most of these cells i
 
 
 # Apply this scheme to the pooled samples
+print('Applying scheme to all pooled samples...')
 
 ## cell IDs with Xist > 1
 exprs <- FetchData(data.combined[['RNA']], vars = chosenSexGenes, slot = "counts")
@@ -229,42 +234,42 @@ data.combined@meta.data$Sex <- 'M'
 data.combined@meta.data[which(row.names(data.combined@meta.data) %in% cells_above_thresh_Xist),'Sex'] <- 'F'
 data.combined@meta.data[which(row.names(data.combined@meta.data) %in% cells_F), 'Sex'] <- 'F' # for those 102 ambiguous cells, can take advantage of the fact that we already know label
 
-
-data.combined@meta.data$sample <- orig.sample + Sex
-cells_unk
-
+data.combined@meta.data$SampleID <- apply(data.combined@meta.data, 1, function(x) paste0(x['SampleID'], '_', x['Sex']))
 
 ## Are there any cells that have both Xist above thresh and at least one Y-markers above thresh?
+### As we would expect, only F cells have these doubles (because everything with high Xist called F), and only pooled cells have detected doubles
+exprs$y1_or_y2 <- 'FALSE'
+exprs[which(exprs$Ddx3y > thresh_Ddx3y | exprs$Eif2s3y > thresh_Eif2s3y),'y1_or_y2'] <- 'TRUE'
 
-### find doublets
+exprs$XandY <- 'FALSE'
+exprs[which( (exprs$y1_or_y2 == TRUE) & exprs$Xist > thresh_Xist),'XandY'] <- 'TRUE'
+
+cells_XandY <- row.names(exprs[which(exprs$XandY == 'TRUE'),])
+
+data.combined@meta.data$XandY <- 'FALSE'
+data.combined@meta.data[row.names(data.combined@meta.data) %in% cells_XandY, 'XandY'] <- 'TRUE'
+
+## Visualize where those cells appear
+XandY_loc_all <- DimPlot(data.combined, cells.highlight = cells_XandY)
+XandY_loc_bySampleID <- DimPlot(data.combined, cells.highlight = cells_XandY, split.by = 'SampleID', ncol=4)
+
+ggsave(filename = paste0(paste0('dp_cellsExpressingXandY.pdf')), 
+       plot = XandY_loc_all, device='pdf', 
+       path = file.path(outputDir, subDir), 
+       width = 30, height=30, units ='cm')
+
+ggsave(filename = paste0(paste0('dp_cellsExpressingXandY_bySampleID.pdf', clusterBy, '.pdf')), 
+       plot = XandY_loc_bySampleID, device='pdf', 
+       path = file.path(outputDir, subDir), 
+       width = 30, height=30, units ='cm')
 
 
-### visualize where they are located
+#  Save variables
+print('Saving variables...')
+setwd(file.path(outputDir, subDir))
+save.image(file = paste0(paste0("allVars.RData")))
+save(data.combined, file = 'seuratObj_data.combined_demux', resToTry, '.RData')
 
 
-
-
-# Create factor for whether or not something is expressed
-
-
-
-
-## Of the F cells that are Xist-, 
-
-### what categories do they fall in?
-
-### how often do they express Y marker genes?
-
-# Compare that to what is expressed in doublets
-
-# Remove cells expressing X and Y
-
-## Where are they in UMAP? (entire cluster need to be removed?)
-
-## List of cells to remove
-
-# Generate list of M and F samples
-
-# Rename samples, redo datafame?
-
+print('~*~ All done! ~*~')
 
