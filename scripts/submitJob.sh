@@ -42,56 +42,43 @@ module load miniconda/3 # to get access to UMAP
 
 # load in paths
 #barcodeSampleLUT=/scratch/users/kmuench/output/cnv16p/201901_cluster_pooled_10x_ms/20190326_troubleshootRunthrough/determineCellSex/allNewID_cells.csv # could be demultiplexed IDs or not
-outputDir="$OUTPUT_16p/201907_cluster_seurat_10x_ms/s1s2_normalization_noFilter" # directory where output stored
+outputDir_all="$OUTPUT_16p/201907_cluster_seurat_10x_ms/20190720_s1s2_normalization_filter1000filter7500" # directory where output stored
 
 # declare for documentation purposes what these variables are
 echo 'Barcode Sample Lookup Table Location: ' $barcodeSampleLUT
-echo 'Output Directory: ' $outputDir
+echo 'Output Directory: ' $outputDir_all
 
 # Import data
 ## Order of variables: (1)output loc , (2) Metadata.csv , (3) Folder containin .mtx data from 10x  # (4) (if applicable) barcodeSampleLUT     e.g. $barcodeSampleLUT
 echo 'Making variables...'
-Rscript 1_initializeVars.R $outputDir $METADAT_16p_SC_MS $MTX_16p_SC_MS  
+#Rscript 1_initializeVars.R $outputDir_all $METADAT_16p_SC_MS $MTX_16p_SC_MS  
 
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined, (4) resolution param
 ## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
 echo 'Finding clusters...'
-Rscript 2_cluster.R $outputDir $METADAT_16p_SC_MS "$outputDir/initializeVars/seuratObj_data.combined.RData" 1.2
+#Rscript 2_cluster.R $outputDir_all $METADAT_16p_SC_MS "$outputDir_all/initializeVars/seuratObj_data.combined.RData" 1.2
 
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined, (4) resolution param
 ## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
 echo 'Finding clusters...'
-Rscript S_sexDemux.R $outputDir $METADAT_16p_SC_MS "$outputDir/cluster/seuratObj_data.combined.RData"
+#Rscript S_sexDemux.R $outputDir_all $METADAT_16p_SC_MS "$outputDir_all/cluster/seuratObj_data.combined.RData"
 
 
 
 
 
-# Merge the individual samples and perform CCA, visualize output to decide on number of CCs to use
-## Order of variables: (1)Folder containing input from makeVars.R, (2) output loc   
-#outputDir_makeVars="$outputDir/makeVars/allVars.RData"
-#echo 'Calculating CCA...'
-#echo 'Importing this makeVars.RData file:' $outputDir_makeVars
-#Rscript calcCCA.R $outputDir_makeVars $outputDir
+# BEGIN THE PART OF THE PIPELINE THAT IS SUBSETTING EXCITATORY CELLS #
+outputDir_excit="$OUTPUT_16p/201907_cluster_seurat_10x_ms/from20190720_excitCluster" # directory where output stored
 
-# Align based on CCs, do tSNE, find clusters
-## Order of variables: 
-### (1) CCA-bearing variable set up in cca_calcCCA.R, 
-### (2) output container folder,
-### (3) chosen number of CCs
-### (4) the chosen resolution
-#echo 'Calculating Clusters...'
-#Rscript clusters.R "$outputDir/calcCCA/data.combined_multiCCA_metadata.RData" $outputDir 40 1.2
+# Find clusters and visualize batch effects
+## (3) path To Data Combined, (4) resolution param
+## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
+echo 'Finding clusters...'
+Rscript 2_cluster.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_all/sexDemux/seuratObj_data.combined_demux.RData" 1.2 "$outputDir_all/analyzeClusters/cells_excitatorySubsetAnalysis.RData"
 
-# Visualize output
-## Order of variables: 
-### (1) File containing CCA-bearing variable set up in cca_calcCCA.R, 
-### (2) output container folder,
-### (3) chosen number of CCs
-### (4) the chosen resolution
-#echo 'Making useful visualizations...'
-#outputDir_clusters="$outputDir/clusters/data.combined_withClust_r1.2_CC40.RData"
-#echo 'Importing this RData file with data and clusters:'
-#Rscript groupCompare.R $outputDir_clusters $outputDir 40 1.2
+
+
+
+print('All done with job script!')

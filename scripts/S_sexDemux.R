@@ -19,6 +19,7 @@
 library('Seurat') 
 library('cowplot')
 library('ggplot2')
+library('dplyr')
 
 print(paste0('Seurat package Version: ', packageVersion('Seurat')) )
 print(paste0('Cowplot package Version: ', packageVersion('cowplot')) )
@@ -112,15 +113,16 @@ ggsave(filename = paste0(paste0('vlnPlot_chosenSexGenes.pdf')),
        path = file.path(outputDir, subDir), 
        width = 45, height=15, units ='cm')
 
-## visualize expression of X-linked genes in tSNE - X = genes, Y=sample
-data.combined_small <- subset(data.combined, 
-                              cells = row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% c('I','K','KM13','KM18','M'),]) ) # note that I am plotting RAW COUNTS here
-fp_chosenSexGenes <- FeaturePlot(data.combined[['RNA']], features = chosenSexGenes, split.by = "orig.ident", slot = "counts")
-
-ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')), 
-       plot = fp_chosenSexGenes, device='pdf', 
-       path = file.path(outputDir, subDir), 
-       width = 40, height=20, units ='cm')
+# !!! NOT WORKING
+# ## visualize expression of X-linked genes in tSNE - X = genes, Y=sample
+# data.combined_small <- subset(data.combined, 
+#                               cells = row.names(data.combined@meta.data[data.combined@meta.data$orig.ident %in% c('I','K','KM13','KM18','M'),]) ) # note that I am plotting RAW COUNTS here
+# fp_chosenSexGenes <- FeaturePlot(data.combined[['RNA']], features = chosenSexGenes, split.by = "orig.ident", slot = "counts")
+# 
+# ggsave(filename = paste0(paste0('fp_chosenSexGenes.pdf')), 
+#        plot = fp_chosenSexGenes, device='pdf', 
+#        path = file.path(outputDir, subDir), 
+#        width = 40, height=20, units ='cm')
 
 
 ## ROC curve to select expression threshold for Chosen Genes 
@@ -258,17 +260,18 @@ ggsave(filename = paste0(paste0('dp_cellsExpressingXandY.pdf')),
        path = file.path(outputDir, subDir), 
        width = 30, height=30, units ='cm')
 
-ggsave(filename = paste0(paste0('dp_cellsExpressingXandY_bySampleID.pdf', clusterBy, '.pdf')), 
+ggsave(filename = paste0(paste0('dp_cellsExpressingXandY_bySampleID.pdf')), 
        plot = XandY_loc_bySampleID, device='pdf', 
        path = file.path(outputDir, subDir), 
        width = 30, height=30, units ='cm')
 
+## !!!!! ADD IN BAR PLOT PROPORTION VISUALIZATION
 
 #  Save variables
 print('Saving variables...')
 setwd(file.path(outputDir, subDir))
 save.image(file = paste0(paste0("allVars.RData")))
-save(data.combined, file = 'seuratObj_data.combined_demux', resToTry, '.RData')
+save(data.combined, file = 'seuratObj_data.combined_demux.RData')
 
 
 print('~*~ All done! ~*~')

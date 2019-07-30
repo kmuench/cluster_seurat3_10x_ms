@@ -45,7 +45,7 @@ load(dataCombinedPath)
 metadata<-read.csv(metadataPath)
 
 #outputDir <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/s1s2_I/'
-
+#pathToCellsToUse <- ''
 
 # Create folder to store output
 setwd(outputDir)
@@ -71,6 +71,12 @@ data.combined <- AddMetaData(data.combined, myMetadata, col.name = metadataCols)
 
 ## Declare that this is integrated analysis
 DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
+
+## Check if you need to only look at a subset of cells
+if (args[5] == TRUE){
+  pathToCellsToUse <- args[5]
+  data.combined <- SubsetData(data.combined, cells = pathToCellsToUse)
+}
 
 ## Run the standard workflow for visualization and clustering
 print('Scaling data, running PCA...')
