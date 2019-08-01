@@ -73,10 +73,22 @@ data.combined <- AddMetaData(data.combined, myMetadata, col.name = metadataCols)
 DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
 
 ## Check if you need to only look at a subset of cells
-if (args[5] == TRUE){
-  pathToCellsToUse <- args[5]
-  data.combined <- SubsetData(data.combined, cells = pathToCellsToUse)
-}
+argsLen <- length(args);
+
+outfile <- if (argsLen < 5) {
+  print('Using all cells...')
+  cellsToUse <- row.names(data.combined@meta.data)
+  head(cellsToUse)
+  }else{
+    pathToCellsToUse <- args[5]
+    print(paste0('Subsetting data - using cell list from ', pathToCellsToUse))
+    load(pathToCellsToUse)
+    head(cellsToUse)
+  }
+
+  
+data.combined <- SubsetData(data.combined, cells = cellsToUse)
+
 
 ## Run the standard workflow for visualization and clustering
 print('Scaling data, running PCA...')
@@ -163,7 +175,7 @@ for (r in resToTry){
 print('Saving variables...')
 setwd(file.path(outputDir, subDir))
 save.image(file = paste0(paste0("allVars_res", resToTry, ".RData")))
-save(data.combined, file = 'seuratObj_data.combined_res', resToTry, '.RData')
+save(data.combined, file = paste0('seuratObj_data.combined_res', resToTry, '.RData'))
 
 
 # Dot plot to visualize major markers

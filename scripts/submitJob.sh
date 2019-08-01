@@ -50,19 +50,19 @@ echo 'Output Directory: ' $outputDir_all
 
 # Import data
 ## Order of variables: (1)output loc , (2) Metadata.csv , (3) Folder containin .mtx data from 10x  # (4) (if applicable) barcodeSampleLUT     e.g. $barcodeSampleLUT
-echo 'Making variables...'
+#echo 'Making variables...'
 #Rscript 1_initializeVars.R $outputDir_all $METADAT_16p_SC_MS $MTX_16p_SC_MS  
 
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined, (4) resolution param
 ## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
-echo 'Finding clusters...'
+#echo 'Finding clusters...'
 #Rscript 2_cluster.R $outputDir_all $METADAT_16p_SC_MS "$outputDir_all/initializeVars/seuratObj_data.combined.RData" 1.2
 
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined, (4) resolution param
 ## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
-echo 'Finding clusters...'
+#echo 'Demultiplexing sex...'
 #Rscript S_sexDemux.R $outputDir_all $METADAT_16p_SC_MS "$outputDir_all/cluster/seuratObj_data.combined.RData"
 
 
@@ -74,11 +74,11 @@ outputDir_excit="$OUTPUT_16p/201907_cluster_seurat_10x_ms/from20190720_excitClus
 
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined, (4) resolution param
-## To change in the future: pass in resolution so you can run different resolutions as different jobs (in parallel)
 echo 'Finding clusters...'
 Rscript 2_cluster.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_all/sexDemux/seuratObj_data.combined_demux.RData" 1.2 "$outputDir_all/analyzeClusters/cells_excitatorySubsetAnalysis.RData"
 
+# Analyze the clusters generally
+## 
+Rscript 3_analyzeClusters.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/cluster/seuratObj_data.combined_res1.2.RData" "/labs/tpalmer/resources/singleCellClusterMarkers/20190729_markerGenes_comprehensive.csv" "$outputDir_all/sexDemux/mapCellsToNewIDs.RData"
 
-
-
-print('All done with job script!')
+echo 'All done with job script!'

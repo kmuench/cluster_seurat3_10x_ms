@@ -267,10 +267,15 @@ ggsave(filename = paste0(paste0('dp_cellsExpressingXandY_bySampleID.pdf')),
 
 ## !!!!! ADD IN BAR PLOT PROPORTION VISUALIZATION
 
+# Save a map of IDs
+
+mapCellsToNewIDs <- data.frame(cells = row.names(data.combined@meta.data), demuxID = data.combined@meta.data$SampleID)
+
 #  Save variables
 print('Saving variables...')
 setwd(file.path(outputDir, subDir))
 save.image(file = paste0(paste0("allVars.RData")))
+save(mapCellsToNewIDs, file = 'mapCellsToNewIDs.RData')
 save(data.combined, file = 'seuratObj_data.combined_demux.RData')
 
 
