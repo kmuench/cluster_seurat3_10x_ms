@@ -16,6 +16,7 @@
 library('Seurat') 
 library('cowplot')
 library('ggplot2')
+library('dplyr')
 
 print(paste0('Seurat package Version: ', packageVersion('Seurat')) )
 print(paste0('Cowplot package Version: ', packageVersion('cowplot')) )
@@ -25,13 +26,13 @@ print(paste0('Ggplot2 package Version: ', packageVersion('ggplot2')) )
 args <- commandArgs(TRUE)
 outputDir <- args[1]
 metadataPath <- args[2]
-dataCombinedPath <- args[3]
+allVarsPath <- args[3]
 singleCellClusterMarkersPath <- args[4]
 demuxId <- args[5]
 
 # Import data
-#dataCombinedPath <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/from20190720_excitCluster/cluster/seuratObj_data.combined_res1.2.RData'
-load(dataCombinedPath)
+#allVarsPath <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/from20190720_excitCluster/cluster/allVars_res1.2.RData'
+load(allVarsPath)
 
 #metadataPath <- '/labs/tpalmer/projects/cnv16p/data/scRNASeq/mouse/metadata/20190718_sampleTable.csv'
 metadata<-read.csv(metadataPath)
@@ -72,10 +73,16 @@ outfile <- if (argsLen < 5) {
   setwd(file.path(outputDir, subDir, bc_sexDemuxFolder))
   
   p1 <- DimPlot(data.combined, reduction = "umap", group.by = 'SampleID')
-  p_split <- DimPlot(data.combined, reduction = "umap", split.by = 'SampleID', ncol=3)
+  p1_split <- DimPlot(data.combined, reduction = "umap", split.by = 'SampleID', ncol=3)
+  
+  p2 <- DimPlot(data.combined, reduction = "umap", group.by = 'Sex')
+  p2_split <- DimPlot(data.combined, reduction = "umap", split.by = 'Sex', ncol=3)
     
   ggsave(filename = paste0('umap_batch_demuxID.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 20, height=20, units ='cm')
-  ggsave(filename = paste0('umap_batch_splitby_demuxID.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 40, height=40, units ='cm')
+  ggsave(filename = paste0('umap_batch_splitby_demuxID.pdf'), plot = p1_split, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 40, height=40, units ='cm')
+  
+  ggsave(filename = paste0('umap_batch_Sex.pdf'), plot = p2, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 20, height=20, units ='cm')
+  ggsave(filename = paste0('umap_batch_splitby_Sex.pdf'), plot = p2_split, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 40, height=40, units ='cm')
   
 }
 
@@ -83,22 +90,10 @@ outfile <- if (argsLen < 5) {
 # # I decided to take out Cluster 26 from the "from20190720_excitCluster" analysis-uncomment to remove that cluster 
 # 
 # data.combined_full <- data.combined
-# data.combined <- subset(data.combined, ident.remove = '26')
+# idents <- levels(data.combined_full@active.ident)
+# data.combined <- subset(data.combined, idents = idents[!(idents %in% c('26','24'))] ) # also see ident.remove
 
 
-# Dot plot to visualize major markers 
-data.combined@meta.data$seurat_clusters <- factor(data.combined@meta.data$seurat_clusters, 
-                                                     levels = c('1','0','25','16','19',
-                                                                '3','21','7','4','24',
-                                                                '22','23','6','9','14',
-                                                                '15', '20','13','17','11',
-                                                                '8','5','2','10','12','18') )# create ordering that will be pretty
-markers.to.plot <- c('Tuba1b', 'Pax6', 'Sox2', 'Top2a', 'Slbp', 'Rrm2', 'Eomes', 'Neurog2', 'Neurod2', 'Mapt', 'Bcl11b', 'Crym', 'Ldb2','Reln', 'Gad2', 'Sst', 'Trem2', 'Igfbp7', 'Otx2', 'Tcf7l2', 'Col1a2', 'Lum', 'Hbb-bh1')
-dp <- DotPlot(data.combined, features = rev(markers.to.plot), cols = c("blue", "red"), dot.scale = 8) + RotatedAxis()
-
-ggsave(filename = paste0('visMarkersForClusters.pdf'), 
-       plot = dp, device='pdf', 
-       path = file.path(outputDir, subDir), width = 20, height=40, units ='cm')
 
 # For each marker list, are there any known cluster markers in the top 50 positive FC genes?
 
@@ -113,7 +108,7 @@ if (file.exists(subDir)){
 }
 
 ## function to identify whether or not known markers in the list
-countMarkers <- function(clust, singleCellClusterMarkers){
+countMarkers <- function(clust, singleCellClusterMarkers, m){
   # what genes are the top in this cluster?
   topMarkers <- row.names(clust[rev(order(clust$WT.SAL_avg_logFC))[1:50],])
   whichMarkersPresent <- singleCellClusterMarkers[which(singleCellClusterMarkers$Transcript %in% topMarkers),]
@@ -134,8 +129,8 @@ countMarkers <- function(clust, singleCellClusterMarkers){
   print(scores_full[c(1:10),])
 
   # save csv for documentation purposes
-  write.csv(file = paste0('whichMarkersPresent_', deparse(substitute(clust)), '.csv'), whichMarkersPresent)
-  write.csv(file = paste0('numberOfHitsPerCategory_', deparse(substitute(clust)), '.csv'), scores)
+  write.csv(file = paste0('whichMarkersPresent_', m, '.csv'), whichMarkersPresent)
+  write.csv(file = paste0('numberOfHitsPerCategory_', m, '.csv'), scores)
   
   # return the list if desired
   return( whichMarkersPresent )
@@ -146,10 +141,183 @@ markerGeneLists <- ls(pattern='clustMarker*')
 
 for (m in markerGeneLists) {
   print(paste0('Marker scores for cluster ', m) )
-  assign(paste0('markersPresent_', m), countMarkers(eval(parse(text = m)), singleCellClusterMarkers) )
+  assign(paste0('markersPresent_', m), countMarkers(eval(parse(text = m)), singleCellClusterMarkers, m) )
 }
 
 
+
+# Are there any population size differences between groups?
+
+## create subfolder to hold all files
+subDir_popTallies <- 'popTallies'
+
+if (file.exists(subDir_popTallies)){
+  setwd(file.path(outputDir, subDir, subDir_popTallies))
+} else {
+  dir.create(file.path(outputDir, subDir, subDir_popTallies))
+  setwd(file.path(outputDir, subDir, subDir_popTallies))
+}
+
+## perform tallying
+tallyClust <- data.frame(data.combined@meta.data %>% group_by(SampleID, seurat_clusters) %>% tally())
+totalCellsPerSample <- data.frame(data.combined@meta.data %>% group_by(SampleID) %>% count())
+tallyClust$total <- data.frame(totalCellsPerSample[match(tallyClust$SampleID, totalCellsPerSample$SampleID),'n'])[,1]
+tallyClust$percent <- (tallyClust$n / tallyClust$total)*100
+neutralColors1 <- c('#009b76', '#eaab00') 
+neutralColors2 <- c('#009b76', '#eaab00') 
+tableauColors <- c('#4e79a7', '#59a14f', '#9c755f', '#f28e2b', '#edc948', '#bab0ac', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7')
+
+## ensure levels are what you want
+data.combined@meta.data$cond <- factor(data.combined@meta.data$cond, levels = c('WT.SAL', 'WT.LPS', 'HET.SAL', 'HET.LPS'))
+data.combined@meta.data$Sex <- factor(data.combined@meta.data$Sex, levels = c('M', 'F'))
+data.combined@meta.data$Condition <- factor(data.combined@meta.data$Condition, levels = c('SAL', 'LPS'))
+data.combined@meta.data$Genotype <- factor(data.combined@meta.data$Genotype, levels = c('WT', 'HET'))
+
+                                                                              
+
+barPlotComparePop_1fac <- function(tallyClust, metaData, chosenFactor, chosenClust, neutralColors){
+  # add factor to list
+  tallyClust$factor <- metaData[match(tallyClust$SampleID, metaData$SampleID), chosenFactor]
+  
+  # just pull out data for the cluster of interest
+  tallyClust_subset <- tallyClust %>% filter(seurat_clusters %in% chosenClust)
+  
+  # one-way anova
+  res.aov <- aov(percent ~ factor, data = tallyClust_subset)
+  print(summary(res.aov))
+  write.table(unclass(summary(res.aov)), file = paste0('stats_group',chosenFactor, '_aov', paste(chosenClust, sep="", collapse="_"), '.csv'))
+  
+  # generate mean and sd
+  plotData <- tallyClust_subset %>% group_by(factor) %>% summarize(myMean = mean(percent), mySd = sd(percent))
+  
+  p <- ggplot(plotData, aes(x=factor, y=myMean, fill=factor) ) +
+    geom_bar(position=position_dodge(), stat="identity",
+             color = "black", size = 0.3) +
+    geom_errorbar(aes(ymin=myMean-mySd, ymax=myMean+mySd), width=.2,
+                  position=position_dodge(.9)) +
+    theme_bw() +
+    xlab(chosenFactor) +
+    ylab("Percent of Cells in Category")+
+    ggtitle(paste0('Percent of Cells in Excitatory Lineage in Cluster ', paste(chosenClust, sep="", collapse="_"))) +
+    scale_fill_manual(values=neutralColors )
+  
+  ggsave(filename = paste0('barPlot_1factor', chosenFactor, '_clust', paste(chosenClust, sep="", collapse="_"), '.pdf'), plot = p, device='pdf',
+         width = 20, height=20, units ='cm')
+  
+  return(res.aov)
+}
+
+barPlotComparePop_2fac <- function(tallyClust, metaData, chosenFactor_A, chosenFactor_B, chosenClust, neutralColors){
+  # add factor to list
+  tallyClust$factor_A <- metaData[match(tallyClust$SampleID, metaData$SampleID), chosenFactor_A]
+  tallyClust$factor_B <- metaData[match(tallyClust$SampleID, metaData$SampleID), chosenFactor_B]
+  
+  # just pull out data for the cluster of interest
+  tallyClust_subset <- tallyClust %>% filter(seurat_clusters %in% chosenClust)
+  
+  # one-way anova
+  res.aov <- aov(percent ~ factor_A * factor_B, data = tallyClust_subset)
+  print(summary(res.aov))
+  write.table(unclass(summary(res.aov)), file = paste0('stats_',chosenFactor_A, '_', chosenFactor_B, '_aov', paste(chosenClust, sep="", collapse="_"), '.csv'))
+  
+  # generate mean and sd
+  plotData <- tallyClust_subset %>% group_by(factor_A, factor_B) %>% summarize(myMean = mean(percent), mySd = sd(percent))
+  
+  p <- ggplot(plotData, aes(x=factor_B, y=myMean, fill=factor_A) ) +
+    geom_bar(position=position_dodge(), stat="identity",
+             color = "black", size = 0.3) +
+    geom_errorbar(aes(ymin=myMean-mySd, ymax=myMean+mySd), width=.2,
+                  position=position_dodge(.9)) +
+    theme_bw() +
+    xlab(chosenFactor_A) +
+    ylab("Percent of Cells in Category")+
+    ggtitle(paste0('Percent of Cells in Excitatory Lineage in Cluster ', paste(chosenClust, sep="", collapse="_"))) +
+    scale_fill_manual(values= neutralColors )
+  
+  ggsave(filename = paste0('barPlot_2factor', chosenFactor_A, '_', chosenFactor_B, '_clust', paste(chosenClust, sep="", collapse="_"), '.pdf'), plot = p, device='pdf',
+         width = 30, height=20, units ='cm')
+  
+  return(res.aov)
+}
+
+for (clust in c(levels(tallyClust$seurat_clusters)) ){
+  print(paste0('Analysis for ', clust))
+  # create folder
+  dirName <- paste0('cluster', clust)
+  if (file.exists(file.path(outputDir, subDir, subDir_popTallies, dirName))){
+    setwd(file.path(outputDir, subDir, subDir_popTallies, dirName))
+  } else {
+    dir.create(file.path(outputDir, subDir, subDir_popTallies, dirName))
+    setwd(file.path(outputDir, subDir, subDir_popTallies, dirName))
+  }
+  print(getwd())
+  
+  # one factor: factor is...
+  ## cond
+  print('One-factor analysis for condition...')
+  barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'cond', clust, tableauColors[c(1:4)])
+
+  ## sex
+  print('One-factor analysis for sex...')
+  barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', clust, tableauColors[c(6,5)])
+  
+  ## Condition
+  print('One-factor analysis for Condition...')
+  barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Condition', clust, tableauColors[c(1,2)])
+  
+  ## Genotype
+  print('One-factor analysis for Genotype...')
+  barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Genotype', clust, tableauColors[c(7:8)])
+  
+  
+  # two factor: factors are...
+  ## Inject * Geno
+  barPlotComparePop_2fac(tallyClust, metaData, 'Genotype', 'Condition', chosenClust, tableauColors[c(7:8)])
+  
+  ## Cond * Sex
+  barPlotComparePop_2fac(tallyClust, metaData, 'Sex', 'cond', chosenClust, tableauColors[c(6,5)])
+  
+}
+
+# Follow up on groups of cells
+
+## Do F have different transits through IPC stage?
+
+# MvF in  11/23/22? 
+setwd(file.path(outputDir, subDir, subDir_popTallies))
+data.combined@meta.data$IPC_Path_A <- FALSE
+data.combined@meta.data[which(data.combined@meta.data$seurat_clusters %in% c('11', '23', '22')),'IPC_Path_A'] <- TRUE
+
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', c('11', '23', '22'), tableauColors[c(6,5)])
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', c('23', '22'), tableauColors[c(6,5)])
+
+
+# MvF in 9/14/15/20?
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', c('9', '14', '15', '20'), tableauColors[c(6,5)])
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', c('14', '15', '20'), tableauColors[c(6,5)])
+
+#MvF in 9/13
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', c('9', '13'), tableauColors[c(6,5)])
+
+# This just looks like a group
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'Sex', c('11', '23', '13'), tableauColors[c(6,5)])
+
+
+# Does condition affect postmitotic neurons
+  # 12, 18
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'cond', c('12', '18'), tableauColors)
+
+  # 10, 12, 18
+barPlotComparePop_1fac(tallyClust, data.combined@meta.data, 'cond', c('10', '12', '18'), tableauColors)
+
+
+#What's the difference between 9 and 13?
+diff_between_9_and_13 <- FindMarkers(data.combined, ident.1 = "9", ident.2 = "13")
+write.csv(diff_between_9_and_13, file ='diff_between_9_and_13.csv')
+
+# Just visualize clusters
+## Visualize 9:
+# DimPlot(data.combined, cells = row.names(data.combined@meta.data[which(data.combined@meta.data$seurat_clusters == '9'),] ) )
 
 
 #  Save variables
@@ -161,121 +329,8 @@ save(data.combined, file = 'seuratObj_data.combined.RData')
 
 print('~*~ All done! ~*~')
 
-# # BONUS - Generate list of cells to use in subset analysis from imported cluster annotation
-
-pathToClusterLabels <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/20190720_s1s2_normalization_filter1000filter7500/cluster/clusterMarkers_res1.2/20190729_clusterAssignments_fullDataset_res1.2.csv'
-clusterLabels <- read.csv(pathToClusterLabels)
-clustersToUse <- clusterLabels[which(clusterLabels$ExcitatoryLineage == TRUE),'Cluster']
-
-cellsToUse <- row.names(data.combined@meta.data[which(data.combined@meta.data$seurat_clusters %in% clustersToUse),])
-setwd(file.path(outputDir, subDir))
-save(cellsToUse, file = 'cells_excitatorySubsetAnalysis.RData')
 
 
 
 
 
-
-
-
-
-
-#  ## SCRATCH
-# # add metadata to Seurat object
-# myCells <- data.frame(cellNames = row.names(data.combined@meta.data), Identity = data.combined@meta.data$orig.ident)
-# metadataCols <- c('SampleID','CellsPerSample','SurgeryDate','Condition', 'Genotype', 'Litter', 'OrderOfLitterExtraction')
-# myMetadata <- merge(metadata[,metadataCols], myCells, by.x='SampleID', by.y='Identity')
-# rownames(myMetadata) <- myMetadata$cellNames
-# data.combined <- AddMetaData(data.combined, myMetadata, col.name = metadataCols) ## add metadata to Seurat object
-# 
-# 
-# # Perform clustering
-# 
-# ## Declare that this is integrated analysis
-# DefaultAssay(data.combined) <- "integrated" # indicate that this is an integrated dataset
-# 
-# ## Run the standard workflow for visualization and clustering
-# print('Scaling data, running PCA...')
-# data.combined <- ScaleData(data.combined, verbose = FALSE)
-# data.combined <- RunPCA(data.combined, npcs = 70, verbose = FALSE)
-# 
-# ## t-SNE and Clustering
-# print('Running UMAP and finding neighbors...')
-# data.combined <- RunUMAP(data.combined, reduction = "pca", dims = 1:49)
-# data.combined <- FindNeighbors(data.combined, reduction = "pca", dims = 1:49)
-# 
-# save(data.combined, file = paste0('seuratObj_data.combined_beforeClustering_res', resToTry, '.RData') )
-# 
-# ## Find clusters for list of resolutions
-# print('Finding clusters...')
-# 
-# for (r in resToTry){
-#   print(paste0('Finding clusters for resolution = ', r))
-#   data.combined <- FindClusters(data.combined, resolution = as.numeric(r))
-#   
-#   ##Visualize
-#   p_labels <- DimPlot(data.combined, reduction = "umap", label = TRUE)
-#   ggsave(filename = paste0(paste0('umap_all_labels_res', r, '.pdf')), plot = p_labels, device='pdf', path = file.path(outputDir, subDir), width = 20, height=20, units ='cm')
-#   
-#   ## Create subdirectory to store data
-#   subDir_clusterMarkers <- paste0('clusterMarkers_res', r)
-#   setwd(file.path(outputDir, subDir))
-#   if (file.exists(subDir_clusterMarkers)){
-#     setwd(file.path(outputDir, subDir,subDir_clusterMarkers))
-#   } else {
-#     dir.create(file.path(outputDir, subDir, subDir_clusterMarkers))
-#     setwd(file.path(outputDir, subDir, subDir_clusterMarkers))
-#   }
-#   
-#   
-#   # Identify cell type markers
-#   ## Generate lists and save
-#   numClust <- max(as.numeric(data.combined@meta.data[,paste0('integrated_snn_res.',r)]))
-#   print(paste0('The numbers of clusters found is ', numClust))
-#   for (c in c(0:(numClust-1))){
-#     print(paste0('Finding markers for cluster ', c, '...'))
-#     
-#     tmp_markers <- FindConservedMarkers(data.combined, ident.1 = as.numeric(c), grouping.var = "cond", verbose = FALSE)
-#     
-#     write.csv(tmp_markers, file = paste0('clustMarker_',c, '.csv'))
-#     assign(paste0('clustMarker_', c) , tmp_markers)
-#     
-#     visGenes <- FeaturePlot(data.combined , features = row.names(head(tmp_markers)) , min.cutoff = "q9")
-#     ggsave(paste0('featurePlot_', c, '.pdf'), plot = visGenes, device = 'pdf', path = file.path(outputDir, subDir, subDir_clusterMarkers), width = 25, height=20, units ='cm')
-#   }
-#   
-#   #objectsToSave <- ls()[grep('clustMarker_',ls())]
-#   #save( eval(parse(text=objectsToSave)) , file = paste0('clusterMarkers_res', r,'.RData'))
-#   
-#   # Visualize batch effects
-#   print(paste0('Visualizing batch effects for resolution ', r, '...'))
-#   
-#   ## Create subdirectory to store data
-#   subDir_batchEffects <- paste0('batchEffects_res', r)
-#   setwd(file.path(outputDir, subDir))
-#   if (file.exists(subDir_batchEffects)){
-#     setwd(file.path(outputDir, subDir,subDir_batchEffects))
-#   } else {
-#     dir.create(file.path(outputDir, subDir, subDir_batchEffects))
-#     setwd(file.path(outputDir, subDir, subDir_batchEffects))
-#   }
-#   
-#   ## Generate visualizations
-#   for (b in metadataCols){
-#     p1 <- DimPlot(data.combined, reduction = "umap", group.by = b)
-#     p_split <- DimPlot(data.combined, reduction = "umap", split.by = b)
-#     
-#     ggsave(filename = paste0('umap_batch_', b,'.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 20, height=20, units ='cm')
-#     ggsave(filename = paste0('umap_batch_splitby_', b,'.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir, subDir_batchEffects), width = 40, height=20, units ='cm')
-#   }
-#   
-#   
-#   
-# }
-# 
-# 
-# 
-# 
-# 
-# 
-# 
