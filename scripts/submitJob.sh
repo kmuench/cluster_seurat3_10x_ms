@@ -75,10 +75,13 @@ outputDir_excit="$OUTPUT_16p/201907_cluster_seurat_10x_ms/from20190720_excitClus
 # Find clusters and visualize batch effects
 ## (3) path To Data Combined, (4) resolution param
 echo 'Finding clusters...'
-Rscript 2_cluster.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_all/sexDemux/seuratObj_data.combined_demux.RData" 1.2 "$outputDir_all/analyzeClusters/cells_excitatorySubsetAnalysis.RData"
+#Rscript 2_cluster.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_all/sexDemux/seuratObj_data.combined_demux.RData" 1.2 "$outputDir_all/analyzeClusters/cells_excitatorySubsetAnalysis.RData"
 
 # Analyze the clusters generally
 ## 
-Rscript 3_analyzeClusters.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/cluster/seuratObj_data.combined_res1.2.RData" "/labs/tpalmer/resources/singleCellClusterMarkers/20190729_markerGenes_comprehensive.csv" "$outputDir_all/sexDemux/mapCellsToNewIDs.RData"
+#Rscript 3_analyzeClusters.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/cluster/seuratObj_data.combined_res1.2.RData" "/labs/tpalmer/resources/singleCellClusterMarkers/20190729_markerGenes_comprehensive.csv" "$outputDir_all/sexDemux/mapCellsToNewIDs.RData"
+
+# DE analysis
+Rscript 5_differentialExpression.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/analyzeClusters/seuratObj_data.combined.RData" 
 
 echo 'All done with job script!'
