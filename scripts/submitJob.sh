@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=124G
 #SBATCH --partition=interactive
-#SBATCH --job-name=noFilt
+#SBATCH --job-name=e_sc
 #SBATCH --time=6-00:00:00
 #SBATCH --mail-user=kmuench@stanford.edu
 #SBATCH --mail-type=ALL
@@ -65,7 +65,8 @@ echo 'Output Directory: ' $outputDir_all
 #echo 'Demultiplexing sex...'
 #Rscript S_sexDemux.R $outputDir_all $METADAT_16p_SC_MS "$outputDir_all/cluster/seuratObj_data.combined.RData"
 
-
+# DE Analysis
+#Rscript 5_differentialExpression.R $outputDir_all $METADAT_16p_SC_MS "$outputDir_all/analyzeClusters/seuratObj_data.combined.RData" "$outputDir_all/cluster/clusterMarkers_res1.2/20190729_clusterAssignments_fullDataset_res1.2.csv"  
 
 
 
@@ -82,6 +83,6 @@ echo 'Finding clusters...'
 #Rscript 3_analyzeClusters.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/cluster/seuratObj_data.combined_res1.2.RData" "/labs/tpalmer/resources/singleCellClusterMarkers/20190729_markerGenes_comprehensive.csv" "$outputDir_all/sexDemux/mapCellsToNewIDs.RData"
 
 # DE analysis
-Rscript 5_differentialExpression.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/analyzeClusters/seuratObj_data.combined.RData" 
+Rscript 5_differentialExpression.R $outputDir_excit $METADAT_16p_SC_MS "$outputDir_excit/analyzeClusters/seuratObj_data.combined.RData" "$outputDir_excit/cluster/20190802_clusterAssignments_excitOnly_res1.2.csv" 
 
 echo 'All done with job script!'

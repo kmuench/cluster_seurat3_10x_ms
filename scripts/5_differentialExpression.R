@@ -12,10 +12,17 @@
 #
 # # # # # # # # # # # # # # # # # #
 
+
+# Prepare workspace -------------------------------------------------------------
+
+print('Preparing workspace...')
+
 # Load needed library
 library('Seurat') 
 library('cowplot')
 library('ggplot2')
+library('dplyr')
+library('tidyr')
 
 print(paste0('Seurat package Version: ', packageVersion('Seurat')) )
 print(paste0('Cowplot package Version: ', packageVersion('cowplot')) )
@@ -26,7 +33,7 @@ args <- commandArgs(TRUE)
 outputDir <- args[1]
 metadataPath <- args[2]
 dataCombinedPath <- args[3]
-#singleCellClusterMarkersPath <- args[4]
+clusterCategoriesPath <- args[4]
 #demuxId <- args[5]
 
 # Import data
@@ -38,14 +45,19 @@ metadata<-read.csv(metadataPath)
 
 #outputDir <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/from20190720_excitCluster'
 
-# singleCellClusterMarkersPath <- '/labs/tpalmer/resources/singleCellClusterMarkers/20190729_markerGenes_comprehensive.csv'
-#singleCellClusterMarkers <- read.csv(singleCellClusterMarkersPath)
+# clusterCategoriesPath <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/from20190720_excitCluster/cluster/20190802_clusterAssignments_excitOnly_res1.2.csv'
+clusterCategories <- read.csv(clusterCategoriesPath)
 
 # mouse 16p region genes
 mouse16pGenes <- c('Bola2', 'Sult1a1', 'Coro1a', 'Mapk3', 'Gdpd3', 'Ypel3', 'Tbx6', 'Ppp4c', 'Aldoa', 'Fam57b', 'Doc2a', 
                    'Ino80e', 'Hirip3', 'Taok2', 'Tmem219', 'Kctd13', 'Asphd1', 'Sez6l2', 'Cdipt', 'Mvp', '290009e17rik', 
                    'Prrt2', 'Maz', 'Kif22', '1810010M01Rik', 'Al467606', 'Qprt', 'Spn', 'Cd2bp2', 'Tbc1d10b', 'Mylpf',
                    'C16orf92', 'Bcl7c')
+
+
+# Uncomment if you suspect 24 and 26 need to be removed
+idents <- levels(data.combined@active.ident)
+data.combined <- subset(data.combined, idents = idents[!(idents %in% c('26','24'))] )
 
 # Create folder to store output
 setwd(outputDir)
@@ -59,33 +71,38 @@ if (file.exists(subDir)){
 }
 
 
-# # Import demultiplexed IDs if possible
-# argsLen <- length(args);
-# 
-# outfile <- if (argsLen < 5) {
-#   print('Using non-demultiplexed IDs...')
-# }else{
-#   demuxID <- '/scratch/users/kmuench/output/cnv16p/201907_cluster_seurat_10x_ms/20190720_s1s2_normalization_filter1000filter7500/sexDemux/mapCellsToNewIDs.RData'
-#   print(paste0('Using demultiplexed IDs from from ', demuxID))
-#   load(demuxID)
+# Plot differences in means -------------------------------------------------------------
+
+# print('Plot differences in means...')
+# plotDiffMeans <- function(data.combined, myCluster, identToUse, x_axis, y_axis, genesToLabel){
 #   
-#   data.combined@meta.data$SampleID <- mapCellsToNewIDs[match(row.names(data.combined@meta.data), mapCellsToNewIDs$cells),'demuxID']
+#   #data.combined <- Idents(data.combined, 'seurat_clusters')
 #   
-#   # Generate some UMAPs on the basis of sex
-#   bc_sexDemuxFolder <- 'batchEffects_sexDemux'
-#   dir.create(file.path(outputDir, subDir, bc_sexDemuxFolder))
-#   setwd(file.path(outputDir, subDir, bc_sexDemuxFolder))
+#   # Subset out data of interest
+#   dataToPlot <- subset(data.combined, idents = myCluster)
+#   Idents(dataToPlot) <- identToUse
+#   avg.dataToPlot <- log1p(AverageExpression(dataToPlot, verbose = FALSE)$RNA)
+#   #avg.dataToPlot$gene <- rownames(dataToPlot)
 #   
-#   p1 <- DimPlot(data.combined, reduction = "umap", group.by = 'SampleID')
-#   p_split <- DimPlot(data.combined, reduction = "umap", split.by = 'SampleID', ncol=3)
-#     
-#   ggsave(filename = paste0('umap_batch_demuxID.pdf'), plot = p1, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 20, height=20, units ='cm')
-#   ggsave(filename = paste0('umap_batch_splitby_demuxID.pdf'), plot = p_split, device='pdf', path = file.path(outputDir, subDir, bc_sexDemuxFolder), width = 40, height=40, units ='cm')
+#   # create plot
+#   p1 <- ggplot(avg.dataToPlot, aes_string(x_axis, y_axis)) + geom_point() +
+#     ggtitle(paste0("Scatterplot of average gene expression \nacross conditions ", x_axis, " and ", y_axis))
+#   p1 <- LabelPoints(plot = p1, points = genesToLabel, repel = TRUE)
 #   
+#   print(p1)
+#   
+#   return(p1)
 # }
+# 
+# plotDiffMeans(data.combined, '9', 'cond', 'WT.SAL', 'WT.LPS', c('Xist') )
+# p <- plotDiffMeans(data.combined, '0', 'cond', 'WT.SAL', 'WT.LPS', row.names(head(de_WT.SALvWT.LPS_0)) )
 
-data.combi <- data.combined
 
+# Find DE genes -------------------------------------------------------------
+
+print('Find differentially expressed...')
+
+# Find DE Genes
 # Chose to run on assay=RNA (raw data):
 # https://github.com/satijalab/seurat/issues/1198
 # https://github.com/satijalab/seurat/issues/1168
@@ -98,8 +115,6 @@ findDEgenes <- function(data.combi, myCluster, factorToCompare, level_A, level_B
   # Differential expresssion
   grp_A <- paste0(myCluster, '_', level_A)
   grp_B <- paste0(myCluster, '_', level_B)
-  #deGenes_AvB <- FindMarkers(data.combi, ident.1 = grp_A, ident.2 = grp_B, verbose = FALSE, logfc.threshold = 0)
-  #deGenes_AvB <- FindMarkers(data.combi, ident.1 = grp_A, ident.2 = grp_B, verbose = FALSE, logfc.threshold = 0, min.pct = 0)
   deGenes_AvB <- FindMarkers(data.combi, ident.1 = grp_A, ident.2 = grp_B, verbose = FALSE, logfc.threshold = 0, assay='RNA')
   head(deGenes_AvB, n = 15)
   
@@ -112,7 +127,7 @@ findDEgenes <- function(data.combi, myCluster, factorToCompare, level_A, level_B
 }
 
 
-for (clust in levels(data.combined@meta.data$seurat_clusters)[c(1:3)]){
+for (clust in levels(data.combined@meta.data$seurat_clusters)){
   print(paste0('Finding out differentially expressed genes for ', clust))
   
   # Compare between specific conditions
@@ -128,10 +143,10 @@ for (clust in levels(data.combined@meta.data$seurat_clusters)[c(1:3)]){
   print(paste0('Setting path to ', getwd() ) )
   assign(paste0('de_WT.SALvWT.LPS_', clust), findDEgenes(data.combined, clust, 'cond', 'WT.SAL', 'WT.LPS') )
   assign(paste0('de_WT.SALvHET.SAL_', clust), findDEgenes(data.combined, clust, 'cond', 'WT.SAL', 'HET.SAL') )
-  #assign(paste0('de_WT.SALvHET.LPS_', clust), findDEgenes(data.combined, clust, 'cond', 'WT.SAL', 'HET.LPS') )
-  #assign(paste0('de_HET.SALvHET.LPS_', clust), findDEgenes(data.combined, clust, 'cond', 'HET.SAL', 'HET.LPS') )
+  assign(paste0('de_WT.SALvHET.LPS_', clust), findDEgenes(data.combined, clust, 'cond', 'WT.SAL', 'HET.LPS') )
+  assign(paste0('de_HET.SALvHET.LPS_', clust), findDEgenes(data.combined, clust, 'cond', 'HET.SAL', 'HET.LPS') )
   
-  # # Compare along sex
+  # Compare along sex
   # print('Comparing along sex generally...')
   # subDir_sex <- 'Sex'
   # 
@@ -175,33 +190,42 @@ for (clust in levels(data.combined@meta.data$seurat_clusters)[c(1:3)]){
   # 
   # print(paste0('Setting path to ', getwd() ) )
   # assign(paste0('de_cond_', clust), findDEgenes(data.combined, clust, 'Condition', 'SAL', 'LPS') )
-
+  
 }
-
-# Visualize features of interest
-
-## 16p genes
-FeaturePlot(data.combined, features = c("Ppp4c", "Aldoa", "Hirip3", 'Ypel3'), split.by = "cond", max.cutoff = 3,
-            cols = c("grey", "red"))
-
-FeaturePlot(data.combined, features = c("Coro1a", "Fam57b", 'Kif22'), split.by = "cond", max.cutoff = 3,
-            cols = c("grey", "red"))
-
-## WT.SAL vs. WT. LPS
-FeaturePlot(data.combined, features = c("Eif3j1", 'Ubc', 'Hist1h2ap'), split.by = "cond", max.cutoff = 3,
-            cols = c("grey", "red"))
+setwd(file.path(outputDir, subDir))
+save.image(file = paste0(paste0("allVars_rightAfterDEanalysis_sc.RData")))
 
 
-# Bar plot - which clusters have the most DE genes? !!!!!!
+# Visualize features of interest -------------------------------------------------------------
+
+print('Visualize features of interest...')
+
+# ## 16p genes
+# FeaturePlot(data.combined, features = c("Ppp4c", "Aldoa", "Hirip3", 'Ypel3'), split.by = "cond", max.cutoff = 3,
+#             cols = c("grey", "red"))
+#
+# FeaturePlot(data.combined, features = c("Coro1a", "Fam57b", 'Kif22'), split.by = "cond", max.cutoff = 3,
+#             cols = c("grey", "red"))
+#
+# ## WT.SAL vs. WT. LPS
+# FeaturePlot(data.combined, features = c("Eif3j1", 'Ubc', 'Hist1h2ap'), split.by = "cond", max.cutoff = 3,
+#             cols = c("grey", "red"))
+
+# Bar plot: DE genes per clust -------------------------------------------------------------
+
+print('Bar plot - which clusters have the most DE genes?')
+
+## Identify list of files to study
 filesToPlot_vWT.LPS <- ls(pattern='de_WT.SALvWT.LPS_*')
 filesToPlot_vHET.SAL <- ls(pattern='de_WT.SALvHET.SAL_*')
 filesToPlot_vHET.LPS <- ls(pattern='de_WT.SALvHET.LPS_*')
 
+## Preallocate plotting data frame
 signifGenesCount <- data.frame(file=c(), nSignifGenes=c(), CtrlVersus=c())
 
-# Count number of signif genes per cluster
+## Count number of signif genes per cluster
 for (f in filesToPlot_vWT.LPS){
-  tmpRow <- data.frame(file = f, 
+  tmpRow <- data.frame(file = f,
                        nSignifGenes = eval(parse(text=f)) %>% filter(p_val_adj < 0.05) %>% nrow,
                        ctrlVersus = 'WT.LPS',
                        clust = strsplit(f, split='_')[[1]][3])
@@ -209,7 +233,7 @@ for (f in filesToPlot_vWT.LPS){
 }
 
 for (f in filesToPlot_vHET.SAL){
-  tmpRow <- data.frame(file = f, 
+  tmpRow <- data.frame(file = f,
                        nSignifGenes = eval(parse(text=f)) %>% filter(p_val_adj < 0.05) %>% nrow,
                        ctrlVersus = 'HET.SAL',
                        clust = strsplit(f, split='_')[[1]][3])
@@ -218,7 +242,7 @@ for (f in filesToPlot_vHET.SAL){
 
 
 for (f in filesToPlot_vHET.LPS){
-  tmpRow <- data.frame(file = f, 
+  tmpRow <- data.frame(file = f,
                        nSignifGenes = eval(parse(text=f)) %>% filter(p_val_adj < 0.05) %>% nrow,
                        ctrlVersus = 'HET.LPS',
                        clust = strsplit(f, split='_')[[1]][3])
@@ -226,46 +250,105 @@ for (f in filesToPlot_vHET.LPS){
 }
 
 
-# Create plot
-b <- ggplot(signifGenesCount, aes(x=clust, y=nSignifGenes, fill = ctrlVersus)) + 
-  geom_bar(stat = 'identity') + 
+## Create plot
+b <- ggplot(signifGenesCount, aes(x=clust, y=nSignifGenes, fill = ctrlVersus)) +
+  geom_bar(stat = 'identity', position='dodge') +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-ggsave(filename = paste0('bar_nSignifGenes_byClust.pdf'), plot = b, device='pdf', 
-       path = file.path(outputDir, subDir), 
+ggsave(filename = paste0('bar_nSignifGenes_byClust.pdf'), plot = b, device='pdf',
+       path = file.path(outputDir, subDir),
        width = 40, height=20, units ='cm')
 
 
-# plot differences in means
-plotDiffMeans <- function(data.combi, myCluster, identToUse, x_axis, y_axis, genesToLabel){
 
-  # Subset out data of interest
-  dataToPlot <- subset(data.combi, idents = myCluster)
-  Idents(dataToPlot) <- identToUse
-  avg.dataToPlot <- log1p(AverageExpression(dataToPlot, verbose = FALSE)$RNA)
-  avg.dataToPlot$gene <- rownames(dataToPlot)
+# Bar plot: numDE per 16p gene -------------------------------------------------------------
 
-  # create plot
-  p1 <- ggplot(avg.t.cells, aes_string(x_axis, y_axis)) + geom_point() +
-    ggtitle(paste0("Scatterplot of average gene expression \nacross conditions ", x_axis, " and ", y_axis))
-  p1 <- LabelPoints(plot = p1, points = genes.to.label, repel = TRUE)
-  print(p1)
+print('Bar plot - what 16p genes are DE in which proportion of clusters (according to type)')
+
+## for each 16p gene, count how many times it appears
+
+signifGenes <- data.frame(gene = c(), file = c(), cluster = c())
+
+for ( f in c(filesToPlot_vHET.LPS, filesToPlot_vHET.SAL) ){
+  signifGenes_tmp <- data.frame(gene = eval(parse(text=f)) %>% subset(p_val_adj < 0.05) %>% row.names,
+                                file = f,
+                                cluster = strsplit(f, split='_')[[1]][3])
+
+  signifGenes <- rbind (signifGenes, signifGenes_tmp)
+  #tmpSig <- data.frame(row.names(eval(parse(text=f))
 }
 
-plotDiffMeans(data.combined, '9', 'cond', 'WT.SAL', 'WT.LPS', c('Xist') )
+## Add general label
+signifGenes$GeneralLabel <- clusterCategories[match(signifGenes$cluster, clusterCategories$Cluster), 'GeneralLabel']
+
+## Creat eplotting data and plot
+signifGenes_16p <- signifGenes %>% filter(gene %in% mouse16pGenes) %>% group_by(gene, GeneralLabel) %>% count()
+signifGenes_16p <- signifGenes_16p[rev(order(signifGenes_16p$n)),]
+
+idealOrder <- signifGenes_16p %>% group_by(gene) %>% summarize(mySum = sum(n))
+idealOrder <- idealOrder[rev(order(idealOrder$mySum)),]
+
+signifGenes_16p$gene <- factor(signifGenes_16p$gene, levels = idealOrder$gene )
+
+g <- ggplot(signifGenes_16p, aes(x=gene, y=n, fill = GeneralLabel)) +
+  geom_bar(stat = "identity", aes(fill = GeneralLabel)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave(filename = paste0('bar_numClustWithGeneDE_by16pGene.pdf'), plot = b, device='pdf',
+       path = file.path(outputDir, subDir),
+       width = 40, height=20, units ='cm')
 
 
+# Bar plot: Expression per category -------------------------------------------------------------
+
+print('Bar plot: expression per category')
+
+## Where are genes being expressed?
+### Get expression for 16p genes for each barcode
+class(data.combined@assays$RNA@data)
+exprs <- data.frame(t(data.combined@assays$RNA@data))
+exprs <- exprs[,colnames(exprs) %in% mouse16pGenes]
+exprs$cell <- row.names(exprs)
+
+### Melt that
+
+gatherCols <- colnames(exprs)
+exprs_16p_long <- exprs %>% gather(Gene, Expression, gatherCols, -cell)
+
+### Assign group label to each barcode - so three cols - GeneralLabel, Gene, Expression
+exprs_16p_long$Cluster <- data.combined@meta.data[match(exprs_16p_long$cell, row.names(data.combined@meta.data)), 'seurat_clusters']
+
+exprs_16p_long$GeneralLabel <- clusterCategories[match(exprs_16p_long$Cluster, clusterCategories$Cluster), 'GeneralLabel']
+
+### Add up Expression by General Category (group by Gene)
+exprs_16p_plot <- exprs_16p_long %>% group_by(GeneralLabel, Gene) %>% summarize(mySum = sum(Expression))
+
+### order for plotting
+idealOrder <- exprs_16p_plot %>% group_by(Gene) %>% summarize(myTotalSum = sum(mySum))
+idealOrder <- idealOrder[rev(order(idealOrder$myTotalSum)),]
+
+exprs_16p_plot$Gene <- factor(exprs_16p_plot$Gene, levels = idealOrder$Gene )
 
 
-# Bar plot - what genes are DE in which proportion of clusters (according to type)
+### plot like above
+g <- ggplot(exprs_16p_plot, aes(x=Gene, y=mySum, fill = GeneralLabel)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-# Bar plot - what genes are EXPRESSED in which proportion of clusters (according to type)
+ggsave(filename = paste0('bar_exprsPerCategory_by16pGene.pdf'), plot = g, device='pdf',
+       path = file.path(outputDir, subDir),
+       width = 40, height=20, units ='cm')
 
+
+# Violin Plot: visualize 16p region genes -------------------------------------------------------------
+
+print('Violin Plot')
 
 # Violin plot visualization of 16p reion genes
-plots <- VlnPlot(data.combined, features = mouse16pGenes, split.by = "stim", group.by = "celltype", 
-                 pt.size = 0, combine = FALSE)
+plots <- VlnPlot(data.combined, features = mouse16pGenes, split.by = "cond",
+                 pt.size = 0, combine = FALSE) #group.by = "celltype",
 CombinePlots(plots = plots, ncol = 1)
+
 
 
 #  Save variables
@@ -276,12 +359,3 @@ save.image(file = paste0(paste0("allVars.RData")))
 #save(data.combined, file = 'seuratObj_data.combined.RData')
 
 print('~*~ All done! ~*~')
-
-
-
-
-
-
-
-
-

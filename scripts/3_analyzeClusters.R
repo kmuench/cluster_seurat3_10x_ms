@@ -88,10 +88,10 @@ outfile <- if (argsLen < 5) {
 
 # # SPECIAL NOTE AUG 2 2019
 # # I decided to take out Cluster 26 from the "from20190720_excitCluster" analysis-uncomment to remove that cluster 
-# 
-# data.combined_full <- data.combined
-# idents <- levels(data.combined_full@active.ident)
-# data.combined <- subset(data.combined, idents = idents[!(idents %in% c('26','24'))] ) # also see ident.remove
+
+data.combined_full <- data.combined
+idents <- levels(data.combined_full@active.ident)
+data.combined <- subset(data.combined, idents = idents[!(idents %in% c('26','24'))] ) # also see ident.remove
 
 
 
@@ -146,6 +146,9 @@ for (m in markerGeneLists) {
 
 
 
+# Population Size Differences ---------------------------------------------
+
+
 # Are there any population size differences between groups?
 
 ## create subfolder to hold all files
@@ -173,7 +176,7 @@ data.combined@meta.data$Sex <- factor(data.combined@meta.data$Sex, levels = c('M
 data.combined@meta.data$Condition <- factor(data.combined@meta.data$Condition, levels = c('SAL', 'LPS'))
 data.combined@meta.data$Genotype <- factor(data.combined@meta.data$Genotype, levels = c('WT', 'HET'))
 
-                                                                              
+# !! ADD IN BONFERRONI                                                               
 
 barPlotComparePop_1fac <- function(tallyClust, metaData, chosenFactor, chosenClust, neutralColors){
   # add factor to list
